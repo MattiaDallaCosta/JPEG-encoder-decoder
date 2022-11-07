@@ -7,5 +7,5 @@
  ``
  ./codec <fileName>
  ``
- Where: <fileName> is the path to the file (relative or absolute) to the image to be encoded
+ Where: ``<fileName>`` is the path to the file (relative or absolute) to the image to be encoded
 #### Important: filename must be a pixmap file (.ppm) of dimensions multiple of 16x16
