@@ -8,4 +8,4 @@
  ./codec <fileName>
  ``
  Where: ``<fileName>`` is the path to the file (relative or absolute) to the image to be encoded
-#### Important: filename must be a pixmap file (.ppm) of dimensions multiple of 16x16
+#### Important: filename must be a pixmap file (.ppm) of dimensions multiple of 16x16 and you need to specify the dimensions in ``include/define.h``
