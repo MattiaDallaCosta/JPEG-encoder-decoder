@@ -805,8 +805,9 @@ void encodeNsend(char * name, int * raw[3], dims_t dims) {
   int ordered_dct[3][PIX_LEN];
   huff_code Luma[2];
   huff_code Chroma[2];
-
+  printf("inside encodeNsend\n");
   rgb_to_dct(raw, ordered_dct, dims);
+  printf("post dct\n");
 	init_huffman(ordered_dct, dims, Luma, Chroma);
   getName(name,newname);
 	write_file(newname, ordered_dct, dims, Luma, Chroma);

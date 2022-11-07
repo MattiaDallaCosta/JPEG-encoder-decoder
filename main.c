@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <string.h>
+#include <unistd.h>
 #include <sys/msg.h>
 #include <sys/ipc.h>
 #include <sys/types.h>
@@ -19,19 +19,10 @@ int raw[3][PIX_LEN];
 int subsampled[3][PIX_LEN/9];
 int ordered_dct[3][PIX_LEN];
 Area diffArea;
+int running = 1;
 
 int main(int argc, char ** argv) {
- //  char name[1024];
 	FILE* f_in;
-
-  // if (argc != 2) {
-  //   printf("expected input = %s <file> \nWhere:\n\t<file> is the file to be converted\n", argv[0]);
-  //   return -1;
-  // }
-	// if (f_in == NULL) {
- //    fprintf(stderr, "\033[0;31mERROR: can't open file %s\033[0m\n", argv[1]);
-	// 	return -1;
-	// }
   creat("/tmp/queue", 0644);
   key_t key = ftok("/tmp/queue", 1);
   int qid = msgget(key, O_RDWR|0644);
@@ -39,7 +30,7 @@ int main(int argc, char ** argv) {
   qid = msgget(key, O_RDWR|IPC_CREAT|0644);
   msg_t msg;
   int i = 0;
-  while (++i) {
+  while (running) {
     msgrcv(qid, (void *) &msg, 1024, 1, 0);
     printf("Comparator: %s\n", msg.mtext);
     if (!(f_in = fopen(msg.mtext, "r"))) {
@@ -56,10 +47,12 @@ int main(int argc, char ** argv) {
     if (validArea(diffArea)) {
       printf("images are different\n");
       store(subsampled);
+      printf("post store\n");
       dims_t diffDims;
       // diffDims.w = diffArea
       encodeNsend(msg.mtext, raw, diffDims);
     } else printf("images are the same\n");
+    sleep(1);
   }
 	return 0;
 }
