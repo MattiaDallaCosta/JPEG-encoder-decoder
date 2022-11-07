@@ -18,8 +18,5 @@ typedef struct __huff_code
 	int sym_code[256];     // the huffman code of the symbol i
 } huff_code;
 
-typedef struct {
-  int w, h;
-} dims_t;
 int read_ppm(FILE* f, int raw[3][PIX_LEN]);
 void encodeNsend(char * name, int raw[3][PIX_LEN]);
