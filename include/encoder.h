@@ -22,4 +22,4 @@ typedef struct {
   int w, h;
 } dims_t;
 int read_ppm(FILE* f, int raw[3][PIX_LEN]);
-void encodeNsend(char * name, int * raw[3], dims_t dims);
+void encodeNsend(char * name, int raw[3][PIX_LEN]);
