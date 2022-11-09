@@ -3,18 +3,9 @@
 #include <sys/types.h>
 
 #include "include/encoder.h"
-#include "include/brain.h"
-
-typedef struct {
-  long mtype;
-  char mtext[1024];
-  int size;
-} msg_t;
 
 int raw[3][PIX_LEN];
-int subsampled[3][PIX_LEN/9];
 int ordered_dct[3][PIX_LEN];
-Area diff;
 
 int main(int argc, char ** argv) {
   char name[1024];
