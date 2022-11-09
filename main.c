@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/msg.h>
 #include <sys/ipc.h>
@@ -8,19 +9,12 @@
 
 #include "include/encoder.h"
 #include "include/brain.h"
-
-typedef struct {
-  long mtype;
-  char mtext[1024];
-  int size;
-} msg_t;
+#include "include/structs.h"
 
 int raw[3][PIX_LEN];
-int subsampled[3][PIX_LEN/9];
-int ordered_dct[3][PIX_LEN];
-Area diffArea;
-int running = 1;
-
+int subsampled[3][PIX_LEN/16];
+int * ordered_dct[3];
+int stored = 0;
 int main(int argc, char ** argv) {
 	FILE* f_in;
   creat("/tmp/queue", 0644);
@@ -28,29 +22,62 @@ int main(int argc, char ** argv) {
   int qid = msgget(key, O_RDWR|0644);
   msgctl(qid, IPC_RMID, NULL);
   qid = msgget(key, O_RDWR|IPC_CREAT|0644);
-  msg_t msg;
   int i = 0;
-  while (running) {
-    msgrcv(qid, (void *) &msg, 1024, 1, 0);
-    printf("Comparator: %s\n", msg.mtext);
-    if (!(f_in = fopen(msg.mtext, "r"))) {
-      printf("\033[0;031mUnable to open file\033[0m\n");
-      return -1;
+    msg_t msg;
+  char text[100];
+  char savedName[100];
+  area_t diffDims[20];
+  while (1) {
+    msgrcv(qid, (void *) &msg, 1028, 1, 0);
+    printf("post msgrcv\n");
+    strcpy(text, msg.mtext);
+    printf("%s\n", msg.mtext);
+    printf("%lu %lu\n",strlen(msg.mtext), strlen(text));
+    printf("%s\n", text);
+    for (int i = 0; i < strlen(text); i++) printf("%i\n", text[i]);
+    printf("\n");
+    for (int i = 0; i < strlen(msg.mtext); i++) printf("%i\n", msg.mtext[i]);
+    printf("\n");
+    printf("%i\n", msg.len);
+    // printf("string %s is equal to end ? %s [%i]\n", text, comp == 0 ? "Yes" : "No", comp);
+    fflush(NULL);
+    if(! strcmp(text, "exit")){
+      printf("\033[0;033mExititng\033[0m\n");
+      msgctl(qid, IPC_RMID, NULL);
+      return 0;
     }
-	  if (read_ppm(f_in, raw)) {
+    if(strcmp(text, "saved") == 0){
+      if(stored){
+        printf("\033[0;032mCreating saved file\033[0m\n");
+        FILE * f_sub = fopen(savedName, "w");
+        writePpm(f_sub, subsampled);
+        fclose(f_sub);
+      } else printf("\033[0;032mNo previous image stored\033[0m\n");
+      // msgctl(qid, IPC_RMID, NULL);
+      continue;
+    }
+    if (!(f_in = fopen(text, "r"))) {
+      fprintf(stderr, "\033[0;031mUnable to open file\033[0m\n");
+      continue;
+    }
+	  if (readPpm(f_in, raw)) {
+      printf("\033[0;031mError reading input file\033[0m\n");
 	  	fclose(f_in);
-	  	return -1;
+	  	continue;
 	  }
 	  fclose(f_in);
     subsample(raw, subsampled);
-    diffArea = compare(subsampled);
-    if (validArea(diffArea)) {
+    int different = compare(subsampled, diffDims);
+    if (different) {
       printf("images are different\n");
       store(subsampled);
+      stored = 1;
+      getSavedName(text, savedName);
       printf("post store\n");
-      dims_t diffDims;
-      // diffDims.w = diffArea
-      encodeNsend(msg.mtext, raw, diffDims);
+      for (int i = 0; i < different; i++) {
+      encodeNsend(text, raw, diffDims[i]);
+      }
+      printf("post encodeNsend\n");
     } else printf("images are the same\n");
     sleep(1);
   }
