@@ -1,4 +1,6 @@
 #include "../include/encoder.h"
+#include <stdio.h>
+#include <string.h>
 
 const int64_t lookup_table[] = {        // contains cos((double_t)(2*(i/8)+1)*(i%8)*M_PI/16) with i = [0-63] saved as int64_t to avoid aproximation
 4607182418800017408,  4607009347991985328,  4606496786581982534,  4605664432017547683,  4604544271217802189,  4603179351334086857,  4600565431771507044,  4596196889902818829,
@@ -105,11 +107,14 @@ double_t getDouble(const int64_t *bitval) {                                     
     return *((double_t*)(bitval));                                                                 // to maintain the preciseness, into an actual double_t
 }
 
-void getName(char *name, char *buff) {
+void getName(char *name, char *buff, int num) {
   char *pos;
   strcpy(buff, name);
   pos = strrchr(buff, '.') ? (strrchr(buff, '.') < strrchr(buff, '/') ? buff + strlen(buff) : strrchr(buff, '.')) : buff + strlen(buff);
-  strcpy(pos,  ".jpg");
+  char *end;
+  if(num > 0) sprintf(end, "-%i.jpg", num);
+  else strcpy(end, ".jpg");
+  strcpy(pos, end);
 }
 
 void getSavedName(char *name, char *buff) {
@@ -172,6 +177,7 @@ void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
 
 void rgb_to_dct(int in[3][PIX_LEN], int out[3][PIX_LEN], area_t dims) {
   int i = 0;
+  int off = dims.y*dims.w + dims.x;
   int app[2][2*dims.w];
   int mid[3][dims.w*dims.h];
   // int dctapp[3][8*WIDTH];
@@ -180,10 +186,10 @@ void rgb_to_dct(int in[3][PIX_LEN], int out[3][PIX_LEN], area_t dims) {
 	for (; i < dims.w*dims.h; i++) {
     int r = i%dims.w;
     int l = i/dims.w;
-		mid[0][i]             =       0.299    * in[0][i] + 0.587    * in[1][i] + 0.114    * in[2][i];
 		// mid[0][(l%8)*WIDTH+r]                =       0.299    * in[0][i] + 0.587    * in[1][i] + 0.114    * in[2][i];
-		app[0][(l%2)*dims.w+r] = 128 - 0.168736 * in[0][i] - 0.331264 * in[1][i] + 0.5      * in[2][i];
-		app[1][(l%2)*dims.w+r] = 128 + 0.5      * in[0][i] - 0.418688 * in[1][i] - 0.081312 * in[2][i];
+		mid[0][i]              =       0.299    * in[0][i+off] + 0.587    * in[1][i+off] + 0.114    * in[2][i+off];
+		app[0][(l%2)*dims.w+r] = 128 - 0.168736 * in[0][i+off] - 0.331264 * in[1][i+off] + 0.5      * in[2][i+off];
+		app[1][(l%2)*dims.w+r] = 128 + 0.5      * in[0][i+off] - 0.418688 * in[1][i+off] - 0.081312 * in[2][i+off];
     if (r%2 == 1 && l%2 == 1) {
 			 mid[1][(l/2*dims.w)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][dims.w+r-1] + app[0][dims.w+r])/4;
 			 mid[2][(l/2*dims.w)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][dims.w+r-1] + app[1][dims.w+r])/4;
@@ -650,8 +656,7 @@ int writePpm(FILE * f, int sub[3][PIX_LEN/16]) {
   return 0;
 }
 
-void encodeNsend(char * name, int raw[3][PIX_LEN], area_t dims) {
-  
+void encodeNsend(char * name, int raw[3][PIX_LEN], area_t dims, int dim) {
   if(dims.h%16 != 0 || dims.w%16 != 0){
     dims.x -= (16 - dims.w%16)/2;
     dims.y -= (16 - dims.h%16)/2;
@@ -662,10 +667,8 @@ void encodeNsend(char * name, int raw[3][PIX_LEN], area_t dims) {
   int ordered_dct[3][dims.h*dims.w];
   huff_code Luma[2];
   huff_code Chroma[2];
-  printf("inside encodeNsend\n");
   rgb_to_dct(raw, ordered_dct, dims);
-  printf("post dct\n");
 	init_huffman(ordered_dct, dims, Luma, Chroma);
-  getName(name,newname);
+  getName(name,newname, dim);
 	write_file(newname, ordered_dct, dims, Luma, Chroma);
 }

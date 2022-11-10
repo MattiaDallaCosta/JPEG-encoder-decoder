@@ -34,13 +34,10 @@ int main (int argc, char ** argv) {
 
   printf("Insert the name of the file you want to compare:\n-> ");
   scanf("%s", imagename);
-  printf("sending message containing [%s] to comparator\n", imagename);
   imagename[strlen(imagename)] = 0;
   msg_t msg;
   msg.mtype = 1;
   strcpy(msg.mtext, imagename);
-  msg.len = strlen(imagename);
-  printf("%i\n", msg.len);
 
   msgsnd(qid, &msg, strlen(imagename)+sizeof(int), 0);
 

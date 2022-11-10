@@ -23,23 +23,13 @@ int main(int argc, char ** argv) {
   msgctl(qid, IPC_RMID, NULL);
   qid = msgget(key, O_RDWR|IPC_CREAT|0644);
   int i = 0;
-    msg_t msg;
   char text[100];
+  msg_t msg;
   char savedName[100];
   area_t diffDims[20];
   while (1) {
     msgrcv(qid, (void *) &msg, 1028, 1, 0);
-    printf("post msgrcv\n");
     strcpy(text, msg.mtext);
-    printf("%s\n", msg.mtext);
-    printf("%lu %lu\n",strlen(msg.mtext), strlen(text));
-    printf("%s\n", text);
-    for (int i = 0; i < strlen(text); i++) printf("%i\n", text[i]);
-    printf("\n");
-    for (int i = 0; i < strlen(msg.mtext); i++) printf("%i\n", msg.mtext[i]);
-    printf("\n");
-    printf("%i\n", msg.len);
-    // printf("string %s is equal to end ? %s [%i]\n", text, comp == 0 ? "Yes" : "No", comp);
     fflush(NULL);
     if(! strcmp(text, "exit")){
       printf("\033[0;033mExititng\033[0m\n");
@@ -52,8 +42,7 @@ int main(int argc, char ** argv) {
         FILE * f_sub = fopen(savedName, "w");
         writePpm(f_sub, subsampled);
         fclose(f_sub);
-      } else printf("\033[0;032mNo previous image stored\033[0m\n");
-      // msgctl(qid, IPC_RMID, NULL);
+      } else printf("\033[0;031mNo previous image stored\033[0m\n");
       continue;
     }
     if (!(f_in = fopen(text, "r"))) {
@@ -67,18 +56,31 @@ int main(int argc, char ** argv) {
 	  }
 	  fclose(f_in);
     subsample(raw, subsampled);
-    int different = compare(subsampled, diffDims);
-    if (different) {
+    if(stored){
+      int different = compare(subsampled, diffDims);
+      printf("%i\n", different);
+      if (different) {
+        printf("images are different\n");
+        store(subsampled);
+        getSavedName(text, savedName);
+        printf("post store\n");
+        for (int i = 0; i < different; i++) {
+          encodeNsend(text, raw, diffDims[i], i);
+          printf("component #%i x: %i y: %i w: %i h: %i\n", i, diffDims[i].x, diffDims[i].h, diffDims[i].w, diffDims[i].h);
+        }
+        printf("post encodeNsend\n");
+      } else printf("images are the same\n");
+    } else {
       printf("images are different\n");
-      store(subsampled);
       stored = 1;
+      store(subsampled);
       getSavedName(text, savedName);
-      printf("post store\n");
-      for (int i = 0; i < different; i++) {
-      encodeNsend(text, raw, diffDims[i]);
-      }
-      printf("post encodeNsend\n");
-    } else printf("images are the same\n");
+      area_t fullImage;
+      fullImage.x = fullImage.y = 0;
+      fullImage.w = WIDTH;
+      fullImage.h = HEIGHT;
+      encodeNsend(text, raw, fullImage, -1);
+    }
     sleep(1);
   }
 	return 0;

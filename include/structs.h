@@ -24,9 +24,6 @@ typedef struct {
 } area_t;
 
 typedef struct {
-  int row;
-  struct {
-    int beg, end;
-  } diffs[WIDTH/4];
-} diff_t;
+  int beg, end;
+} pair_t;
 
