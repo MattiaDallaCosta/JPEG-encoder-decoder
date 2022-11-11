@@ -4,19 +4,9 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/types.h>
-
-
-typedef struct {
-  long mtype;
-  char mtext[100];
-  int len;
-} msg_t;
+#include "include/structs.h"
 
 int main (int argc, char ** argv) {
-  // if (argc != 2) {
-  //   printf("Usage: %s <file>\nWhere <file> is the image to be compared\n",argv[0]);
-  //   return -1;
-  // }
   char imagename[100];
   key_t key = ftok("/tmp/queue", 1);
   if (key == -1) {
@@ -38,6 +28,7 @@ int main (int argc, char ** argv) {
   msg_t msg;
   msg.mtype = 1;
   strcpy(msg.mtext, imagename);
+  msg.len = 0;
 
   msgsnd(qid, &msg, strlen(imagename)+sizeof(int), 0);
 

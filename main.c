@@ -11,25 +11,43 @@
 #include "include/brain.h"
 #include "include/structs.h"
 
-int raw[3][PIX_LEN];
-int subsampled[3][PIX_LEN/16];
-int * ordered_dct[3];
-int stored = 0;
+uint8_t raw[3][PIX_LEN];
+uint8_t subsampled[3][PIX_LEN/16];
+uint8_t stored = 0;
+
 int main(int argc, char ** argv) {
 	FILE* f_in;
   creat("/tmp/queue", 0644);
   key_t key = ftok("/tmp/queue", 1);
-  int qid = msgget(key, O_RDWR|0644);
-  msgctl(qid, IPC_RMID, NULL);
+  int qid = msgget(key, IPC_EXCL|IPC_CREAT|0644);
+  if (qid == -1) {
+    msg_t msg;
+    msg.mtype = 1;
+    strcpy(msg.mtext, "exit");
+    qid = msgget(key, O_RDWR|0644);
+    msgsnd(qid, &msg, strlen(msg.mtext), 0);
+    printf("\033[0;031mClosing existing queue\033[0m\n");
+    msgctl(qid, IPC_RMID, NULL);
+  }
   qid = msgget(key, O_RDWR|IPC_CREAT|0644);
   int i = 0;
   char text[100];
-  msg_t msg;
   char savedName[100];
   area_t diffDims[20];
   while (1) {
-    msgrcv(qid, (void *) &msg, 1028, 1, 0);
+    msg_t msg;
+    printf("pre msgrcv()\n");
+    printf("msgrcv = %zi\n", msgrcv(qid, &msg, 104, 1, MSG_NOERROR));
+    printf("post msgrcv()\n");
     strcpy(text, msg.mtext);
+    printf("strlen msg: %lu\n", strlen(text));
+    for (int i = 0; i < strlen(msg.mtext); i++) {
+      printf("%c\n", text[i]);
+    }
+    printf("\n");
+    printf("message: %s %s\n",text, msg.mtext);
+
+    printf("is the message received equal to exit? %i\n", strcmp(text, "exit")/*  ? "No" : "Yes" */);
     fflush(NULL);
     if(! strcmp(text, "exit")){
       printf("\033[0;033mExititng\033[0m\n");
@@ -60,18 +78,18 @@ int main(int argc, char ** argv) {
       int different = compare(subsampled, diffDims);
       printf("%i\n", different);
       if (different) {
-        printf("images are different\n");
+        printf("Images are different\n");
         store(subsampled);
         getSavedName(text, savedName);
-        printf("post store\n");
+        printf("Post store\n");
         for (int i = 0; i < different; i++) {
           encodeNsend(text, raw, diffDims[i], i);
-          printf("component #%i x: %i y: %i w: %i h: %i\n", i, diffDims[i].x, diffDims[i].h, diffDims[i].w, diffDims[i].h);
+          printf("Component #%i x: %i y: %i w: %i h: %i\n", i, diffDims[i].x, diffDims[i].h, diffDims[i].w, diffDims[i].h);
         }
-        printf("post encodeNsend\n");
-      } else printf("images are the same\n");
+        printf("Post encodeNsend\n");
+      } else printf("ImPges are the same\n");
     } else {
-      printf("images are different\n");
+      printf("No image stored\nStoring and encoding\n");
       stored = 1;
       store(subsampled);
       getSavedName(text, savedName);
@@ -79,8 +97,10 @@ int main(int argc, char ** argv) {
       fullImage.x = fullImage.y = 0;
       fullImage.w = WIDTH;
       fullImage.h = HEIGHT;
+      printf("pre-encoding\n");
       encodeNsend(text, raw, fullImage, -1);
     }
+    printf("Done\n");
     sleep(1);
   }
 	return 0;

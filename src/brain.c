@@ -4,9 +4,9 @@
 #include <string.h>
 #include <unistd.h>
 
-int saved[3][PIX_LEN/3];
+int saved[3][PIX_LEN/16];
 
-void subsample(int in[3][PIX_LEN], int out[3][PIX_LEN/16]) {
+void subsample(uint8_t in[3][PIX_LEN], uint8_t out[3][PIX_LEN/16]) {
   int i = 0;
   for (; i < PIX_LEN/16; i++) {
     int bigh = (i/(WIDTH/4))*4;
@@ -29,7 +29,7 @@ void subsample(int in[3][PIX_LEN], int out[3][PIX_LEN/16]) {
   }
 }
 
-void store(int in[3][PIX_LEN/16]) {
+void store(uint8_t in[3][PIX_LEN/16]) {
   int i = 0;
   for(; i < PIX_LEN/16; i++) {
     saved[0][i] = in[0][i];
@@ -39,7 +39,7 @@ void store(int in[3][PIX_LEN/16]) {
   }
 }
 
-int compare(int in[3][PIX_LEN/16], area_t outs[20]){
+int compare(uint8_t in[3][PIX_LEN/16], area_t outs[20]){
   int isDifferent = 0;
   pair_t differences[PIX_LEN/32];
   // diff_t app;
@@ -109,8 +109,5 @@ int compare(int in[3][PIX_LEN/16], area_t outs[20]){
       j++;
     }
   }
-  // struct pair {
-  //   int raw, val;
-  // } begs[WIDTH/4], ends[WIDTH/4], appo[WIDTH/4];
   return isDifferent;
 }

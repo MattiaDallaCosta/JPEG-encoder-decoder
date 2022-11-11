@@ -1,4 +1,5 @@
 #include "../include/encoder.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -42,7 +43,7 @@ const int scan_order[] = {
 58, 59, 52, 45, 38, 31, 39, 46,
 53, 60, 61, 54, 47, 55, 62, 63};
 
-int readPpm(FILE* f, int raw[3][PIX_LEN]) {
+int readPpm(FILE* f, uint8_t raw[3][PIX_LEN]) {
 	if( fgetc(f) != 'P' || fgetc(f) != '6' )
 	{
 		fprintf(stderr, "Could not find magic number for this PPM!\n");
@@ -124,18 +125,18 @@ void getSavedName(char *name, char *buff) {
   strcpy(*pos == '/' ? pos+1 : pos,  "savedImage.ppm");
 }
 
-void zigzag_block(int in[64], int out[64]) {
+void zigzag_block(int16_t in[64], int16_t out[64]) {
 	int i,j;
 	for (i=0; i<64; i++) out[i] = in[scan_order[i]];
 }
 
-void dct_block(int gap, int in[], int out[],const int quantizer[])
+void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[])
 {
 	int x_f, y_f; // frequency domain coordinates
 	int x_t, y_t; // time domain coordinates
 
 	double inner_lookup[64];
-	int dct[64];
+	int16_t dct[64];
 	for (x_t=0; x_t<8; x_t++)
 		for (y_f=0; y_f<8; y_f++)
 		{
@@ -175,11 +176,15 @@ void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
 	}
 }
 
-void rgb_to_dct(int in[3][PIX_LEN], int out[3][PIX_LEN], area_t dims) {
+void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
+  printf("inside dct\n");
+  printf("dims x: %i y: %i w: %i h: %i\n", dims.x, dims.h, dims.w, dims.h);
   int i = 0;
   int off = dims.y*dims.w + dims.x;
-  int app[2][2*dims.w];
-  int mid[3][dims.w*dims.h];
+  uint8_t app[2][2*dims.w];
+  printf("post app\n");
+  uint8_t mid[3][dims.w*dims.h];
+  printf("post alloc\n");
   // int dctapp[3][8*WIDTH];
   int last[3] = {0, 0, 0};
   int begin, j;
@@ -356,14 +361,14 @@ int huff_class(int value)
 	return class;
 }
 
-void calc_dc_freq(int num_pixel, int dct_quant[], int freq[])
+void calc_dc_freq(int num_pixel, int16_t dct_quant[], int freq[])
 {
 	int i;
 	for (i=0; i<num_pixel; i+=64)
 		freq[huff_class(dct_quant[i])]++;
 }
 
-void calc_ac_freq(int num_pixel, int dct_quant[], int freq[])
+void calc_ac_freq(int num_pixel, int16_t dct_quant[], int freq[])
 {
 	int i;
 	int num_zeros = 0;
@@ -402,7 +407,7 @@ void calc_ac_freq(int num_pixel, int dct_quant[], int freq[])
 	}
 }
 
-void init_huffman(int processed[3][PIX_LEN], area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
+void init_huffman(int16_t processed[3][PIX_LEN], area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
 	int i;
 
 	huff_code* luma_dc =   &Luma[0];
@@ -502,7 +507,7 @@ void encode_ac_value(FILE* f, int ac_val, int num_zeros, huff_code* huff)
 	write_bits(f, id, class);
 }
 
-void write_coefficients(FILE* f, int num_pixel, int dct_quant[], huff_code* huff_dc, huff_code* huff_ac)
+void write_coefficients(FILE* f, int num_pixel, int16_t dct_quant[], huff_code* huff_dc, huff_code* huff_ac)
 {
 	int num_zeros = 0;
 	int last_nonzero;
@@ -562,7 +567,7 @@ void write_dht_header(FILE* f, int code_len_freq[], int sym_sorted[], int tc_th)
 		fputc(sym_sorted[i], f); // huffval, needed to reconstruct the huffman code at the receiver
 }
 
-void write_file(char* file_name, int out[3][PIX_LEN], area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
+void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
 	FILE* f = fopen(file_name, "w");
 	fputc(0xFF, f); fputc(0xD8, f); // SOI Symbol
 
@@ -649,26 +654,32 @@ void write_file(char* file_name, int out[3][PIX_LEN], area_t dims, huff_code Lum
 	fclose(f);
 }
 
-int writePpm(FILE * f, int sub[3][PIX_LEN/16]) {
+int writePpm(FILE * f, uint8_t sub[3][PIX_LEN/16]) {
   // char dims[100];
   fprintf(f, "P6\n%i %i\n255\n", WIDTH/4, HEIGHT/4);
   for (int i = 0; i < 3*(PIX_LEN/16); i++) putc(sub[i%3][i/3], f);
   return 0;
 }
 
-void encodeNsend(char * name, int raw[3][PIX_LEN], area_t dims, int dim) {
+void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims, int dim) {
   if(dims.h%16 != 0 || dims.w%16 != 0){
     dims.x -= (16 - dims.w%16)/2;
     dims.y -= (16 - dims.h%16)/2;
     dims.w += (dims.w%16);
     dims.h += (dims.h%16);
   }
-  char newname[1024];
-  int ordered_dct[3][dims.h*dims.w];
+  printf("pre alloc 1\n");
+  char newname[100];
+  int16_t ordered_dct[3][dims.h*dims.w];
+  printf("post alloc 1\n");
   huff_code Luma[2];
   huff_code Chroma[2];
+  printf("pre dct\n");
   rgb_to_dct(raw, ordered_dct, dims);
+  printf("pre huffman\n");
 	init_huffman(ordered_dct, dims, Luma, Chroma);
-  getName(name,newname, dim);
+  printf("pre write\n");
+  getName(name, newname, dim);
 	write_file(newname, ordered_dct, dims, Luma, Chroma);
+  printf("post Write\n");
 }
