@@ -11,21 +11,23 @@ void subsample(uint8_t in[3][PIX_LEN], uint8_t out[3][PIX_LEN/16]) {
   for (; i < PIX_LEN/16; i++) {
     int bigh = (i/(WIDTH/4))*4;
     int bigw = (i%(WIDTH/4))*4;
-    out[0][i] = (in[0][bigh*WIDTH+bigw]     + in[0][bigh*WIDTH+bigw+1]     + in[0][bigh*WIDTH+bigw+2]     + in[0][bigh*WIDTH+bigw+3]);
-    out[0][i] += (in[0][(bigh+1)*WIDTH+bigw] + in[0][(bigh+1)*WIDTH+bigw+1] + in[0][(bigh+1)*WIDTH+bigw+2] + in[0][(bigh+1)*WIDTH+bigw+3]);
-    out[0][i] += (in[0][(bigh+2)*WIDTH+bigw] + in[0][(bigh+2)*WIDTH+bigw+1] + in[0][(bigh+2)*WIDTH+bigw+2] + in[0][(bigh+2)*WIDTH+bigw+3]);
-    out[0][i] += (in[0][(bigh+3)*WIDTH+bigw] + in[0][(bigh+3)*WIDTH+bigw+1] + in[0][(bigh+3)*WIDTH+bigw+2] + in[0][(bigh+3)*WIDTH+bigw+3]);
-    out[0][i] /= 16;
-    out[1][i] = (in[1][bigh*WIDTH+bigw]     + in[1][bigh*WIDTH+bigw+1]     + in[1][bigh*WIDTH+bigw+2]     + in[1][bigh*WIDTH+bigw+3]);
-    out[1][i] += (in[1][(bigh+1)*WIDTH+bigw] + in[1][(bigh+1)*WIDTH+bigw+1] + in[1][(bigh+1)*WIDTH+bigw+2] + in[1][(bigh+1)*WIDTH+bigw+3]);
-    out[1][i] += (in[1][(bigh+2)*WIDTH+bigw] + in[1][(bigh+2)*WIDTH+bigw+1] + in[1][(bigh+2)*WIDTH+bigw+2] + in[1][(bigh+2)*WIDTH+bigw+3]);
-    out[1][i] += (in[1][(bigh+3)*WIDTH+bigw] + in[1][(bigh+3)*WIDTH+bigw+1] + in[1][(bigh+3)*WIDTH+bigw+2] + in[1][(bigh+3)*WIDTH+bigw+3]);
-    out[1][i] /= 16;
-    out[2][i] = (in[2][bigh*WIDTH+bigw]     + in[2][bigh*WIDTH+bigw+1]     + in[2][bigh*WIDTH+bigw+2]     + in[2][bigh*WIDTH+bigw+3]);
-    out[2][i] += (in[2][(bigh+1)*WIDTH+bigw] + in[2][(bigh+1)*WIDTH+bigw+1] + in[2][(bigh+1)*WIDTH+bigw+2] + in[2][(bigh+1)*WIDTH+bigw+3]);
-    out[2][i] += (in[2][(bigh+2)*WIDTH+bigw] + in[2][(bigh+2)*WIDTH+bigw+1] + in[2][(bigh+2)*WIDTH+bigw+2] + in[2][(bigh+2)*WIDTH+bigw+3]);
-    out[2][i] += (in[2][(bigh+3)*WIDTH+bigw] + in[2][(bigh+3)*WIDTH+bigw+1] + in[2][(bigh+3)*WIDTH+bigw+2] + in[2][(bigh+3)*WIDTH+bigw+3]);
-    out[2][i] /= 16;
+    int appo;
+    appo =  (in[0][bigh*WIDTH+bigw]     + in[0][bigh*WIDTH+bigw+1]     + in[0][bigh*WIDTH+bigw+2]     + in[0][bigh*WIDTH+bigw+3]);
+    appo += (in[0][(bigh+1)*WIDTH+bigw] + in[0][(bigh+1)*WIDTH+bigw+1] + in[0][(bigh+1)*WIDTH+bigw+2] + in[0][(bigh+1)*WIDTH+bigw+3]);
+    appo += (in[0][(bigh+2)*WIDTH+bigw] + in[0][(bigh+2)*WIDTH+bigw+1] + in[0][(bigh+2)*WIDTH+bigw+2] + in[0][(bigh+2)*WIDTH+bigw+3]);
+    appo += (in[0][(bigh+3)*WIDTH+bigw] + in[0][(bigh+3)*WIDTH+bigw+1] + in[0][(bigh+3)*WIDTH+bigw+2] + in[0][(bigh+3)*WIDTH+bigw+3]);
+    out[0][i] = appo/16;
+    appo =  (in[1][bigh*WIDTH+bigw]     + in[1][bigh*WIDTH+bigw+1]     + in[1][bigh*WIDTH+bigw+2]     + in[1][bigh*WIDTH+bigw+3]);
+    appo += (in[1][(bigh+1)*WIDTH+bigw] + in[1][(bigh+1)*WIDTH+bigw+1] + in[1][(bigh+1)*WIDTH+bigw+2] + in[1][(bigh+1)*WIDTH+bigw+3]);
+    appo += (in[1][(bigh+2)*WIDTH+bigw] + in[1][(bigh+2)*WIDTH+bigw+1] + in[1][(bigh+2)*WIDTH+bigw+2] + in[1][(bigh+2)*WIDTH+bigw+3]);
+    appo += (in[1][(bigh+3)*WIDTH+bigw] + in[1][(bigh+3)*WIDTH+bigw+1] + in[1][(bigh+3)*WIDTH+bigw+2] + in[1][(bigh+3)*WIDTH+bigw+3]);
+    out[1][i] = appo/16;
+    appo = (in[2][bigh*WIDTH+bigw]     + in[2][bigh*WIDTH+bigw+1]     + in[2][bigh*WIDTH+bigw+2]     + in[2][bigh*WIDTH+bigw+3]);
+    appo += (in[2][(bigh+1)*WIDTH+bigw] + in[2][(bigh+1)*WIDTH+bigw+1] + in[2][(bigh+1)*WIDTH+bigw+2] + in[2][(bigh+1)*WIDTH+bigw+3]);
+    appo += (in[2][(bigh+2)*WIDTH+bigw] + in[2][(bigh+2)*WIDTH+bigw+1] + in[2][(bigh+2)*WIDTH+bigw+2] + in[2][(bigh+2)*WIDTH+bigw+3]);
+    appo += (in[2][(bigh+3)*WIDTH+bigw] + in[2][(bigh+3)*WIDTH+bigw+1] + in[2][(bigh+3)*WIDTH+bigw+2] + in[2][(bigh+3)*WIDTH+bigw+3]);
+    out[2][i] = appo/16;
+    printf("%i, %i, %i\n", out[0][i], out[1][i], out[2][i]);
   }
 }
 
@@ -68,6 +70,7 @@ int compare(uint8_t in[3][PIX_LEN/16], area_t outs[20]){
       }
       differences[i/(WIDTH/4)+j].end = i%(WIDTH/4);
     } else {
+      printf("%i == %i, %i == %i, %i == %i\n", in[0][i], saved[0][i], in[1][i], saved[1][i], in[2][i], saved[2][i]);
       if (isDifferent) { 
         isDifferent = 0;
         j++;

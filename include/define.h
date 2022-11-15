@@ -1,7 +1,7 @@
 #pragma once
 
-#define WIDTH 64
-#define HEIGHT 64
+#define WIDTH 640
+#define HEIGHT 640
 #define PIX_LEN WIDTH*HEIGHT
 
 #define ScanOrder(i) (i/64)*64 + scan_order[i%64]

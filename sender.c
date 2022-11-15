@@ -26,9 +26,9 @@ int main (int argc, char ** argv) {
   scanf("%s", imagename);
   imagename[strlen(imagename)] = 0;
   msg_t msg;
-  msg.mtype = 1;
+  msg.mtype = 1l;
   strcpy(msg.mtext, imagename);
-  msg.len = 0;
+  // msg.len = 0;
 
   msgsnd(qid, &msg, strlen(imagename)+sizeof(int), 0);
 

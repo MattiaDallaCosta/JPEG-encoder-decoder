@@ -123,6 +123,7 @@ void getSavedName(char *name, char *buff) {
   strcpy(buff, name);
   pos =  strrchr(buff, '/') ? strrchr(buff, '/') : buff;
   strcpy(*pos == '/' ? pos+1 : pos,  "savedImage.ppm");
+  printf("%s\n", buff);
 }
 
 void zigzag_block(int16_t in[64], int16_t out[64]) {
@@ -656,12 +657,21 @@ void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code
 
 int writePpm(FILE * f, uint8_t sub[3][PIX_LEN/16]) {
   // char dims[100];
-  fprintf(f, "P6\n%i %i\n255\n", WIDTH/4, HEIGHT/4);
-  for (int i = 0; i < 3*(PIX_LEN/16); i++) putc(sub[i%3][i/3], f);
+  fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
+  for (int i = 0; i < (PIX_LEN); i++){
+    int w = i%(WIDTH);
+    int h = i/(WIDTH);
+    printf("%i, ", sub[0][(h/4)*WIDTH/4+w/4]);
+    printf("%i, ", sub[1][(h/4)*WIDTH/4+w/4]);
+    printf("%i\n", sub[2][(h/4)*WIDTH/4+w/4]);
+    putc(sub[0][(h/4)*WIDTH/4+w/4], f);
+    putc(sub[1][(h/4)*WIDTH/4+w/4], f);
+    putc(sub[2][(h/4)*WIDTH/4+w/4], f);
+  }
   return 0;
 }
 
-void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims, int dim) {
+void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims) {
   if(dims.h%16 != 0 || dims.w%16 != 0){
     dims.x -= (16 - dims.w%16)/2;
     dims.y -= (16 - dims.h%16)/2;
@@ -669,7 +679,6 @@ void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims, int dim) {
     dims.h += (dims.h%16);
   }
   printf("pre alloc 1\n");
-  char newname[100];
   int16_t ordered_dct[3][dims.h*dims.w];
   printf("post alloc 1\n");
   huff_code Luma[2];
@@ -679,7 +688,6 @@ void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims, int dim) {
   printf("pre huffman\n");
 	init_huffman(ordered_dct, dims, Luma, Chroma);
   printf("pre write\n");
-  getName(name, newname, dim);
-	write_file(newname, ordered_dct, dims, Luma, Chroma);
+	write_file(name, ordered_dct, dims, Luma, Chroma);
   printf("post Write\n");
 }
