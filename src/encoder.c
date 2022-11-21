@@ -113,8 +113,8 @@ void getName(char *name, char *buff, int num) {
   strcpy(buff, name);
   pos = strrchr(buff, '.') ? (strrchr(buff, '.') < strrchr(buff, '/') ? buff + strlen(buff) : strrchr(buff, '.')) : buff + strlen(buff);
   char *end;
-  if(num > 0) sprintf(end, "-%i.jpg", num);
-  else strcpy(end, ".jpg");
+  if(num < 0) strcpy(end, ".jpg");
+  else sprintf(end, "-%i.jpg", num);
   strcpy(pos, end);
 }
 
@@ -123,16 +123,16 @@ void getSavedName(char *name, char *buff) {
   strcpy(buff, name);
   pos =  strrchr(buff, '/') ? strrchr(buff, '/') : buff;
   strcpy(*pos == '/' ? pos+1 : pos,  "savedImage.ppm");
-  printf("%s\n", buff);
 }
 
 void zigzag_block(int16_t in[64], int16_t out[64]) {
-	int i,j;
-	for (i=0; i<64; i++) out[i] = in[scan_order[i]];
+	int i = 0;
+	for (; i < 64; i++) {
+    out[i] = in[scan_order[i]];
+  }
 }
 
-void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[])
-{
+void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[]) {
 	int x_f, y_f; // frequency domain coordinates
 	int x_t, y_t; // time domain coordinates
 
@@ -178,14 +178,11 @@ void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
 }
 
 void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
-  printf("inside dct\n");
-  printf("dims x: %i y: %i w: %i h: %i\n", dims.x, dims.h, dims.w, dims.h);
+  // printf("dims x: %i y: %i w: %i h: %i\n", dims.x, dims.y, dims.w, dims.h);
   int i = 0;
-  int off = dims.y*dims.w + dims.x;
+  int off = dims.y*WIDTH + dims.x;
   uint8_t app[2][2*dims.w];
-  printf("post app\n");
   uint8_t mid[3][dims.w*dims.h];
-  printf("post alloc\n");
   // int dctapp[3][8*WIDTH];
   int last[3] = {0, 0, 0};
   int begin, j;
@@ -656,38 +653,43 @@ void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code
 }
 
 int writePpm(FILE * f, uint8_t sub[3][PIX_LEN/16]) {
-  // char dims[100];
   fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
+  printf("maxnum = %i\n\n", PIX_LEN);
   for (int i = 0; i < (PIX_LEN); i++){
+    printf("\033[1A%i\n",i);
     int w = i%(WIDTH);
     int h = i/(WIDTH);
-    printf("%i, ", sub[0][(h/4)*WIDTH/4+w/4]);
-    printf("%i, ", sub[1][(h/4)*WIDTH/4+w/4]);
-    printf("%i\n", sub[2][(h/4)*WIDTH/4+w/4]);
     putc(sub[0][(h/4)*WIDTH/4+w/4], f);
     putc(sub[1][(h/4)*WIDTH/4+w/4], f);
     putc(sub[2][(h/4)*WIDTH/4+w/4], f);
   }
+  fclose(f);
+  return 0;
+}
+
+int writeDiffPpm(char * filename, uint8_t sub[3][PIX_LEN], area_t * dims) {
+  FILE * f = fopen(filename, "w");
+  int off = WIDTH * dims->y + dims->x;
+  fprintf(f, "P6\n%i %i\n255\n", dims->w, dims->h);
+  printf("maxnum = %i\n\n", dims->w*dims->h);
+  for (int i = 0; i < (dims->h * dims->w); i++){
+    printf("\033[1A%i\n",i);
+    int w = i%(dims->w);
+    int h = i/(dims->w);
+    putc(sub[0][off+h*WIDTH+w], f);
+    putc(sub[1][off+h*WIDTH+w], f);
+    putc(sub[2][off+h*WIDTH+w], f);
+  }
+  fclose(f);
   return 0;
 }
 
 void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims) {
-  if(dims.h%16 != 0 || dims.w%16 != 0){
-    dims.x -= (16 - dims.w%16)/2;
-    dims.y -= (16 - dims.h%16)/2;
-    dims.w += (dims.w%16);
-    dims.h += (dims.h%16);
-  }
-  printf("pre alloc 1\n");
-  int16_t ordered_dct[3][dims.h*dims.w];
-  printf("post alloc 1\n");
+  int16_t ordered_dct[3][PIX_LEN];
   huff_code Luma[2];
   huff_code Chroma[2];
-  printf("pre dct\n");
   rgb_to_dct(raw, ordered_dct, dims);
-  printf("pre huffman\n");
 	init_huffman(ordered_dct, dims, Luma, Chroma);
-  printf("pre write\n");
 	write_file(name, ordered_dct, dims, Luma, Chroma);
-  printf("post Write\n");
+  printf("encodeNsend done!\n");
 }

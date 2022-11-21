@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sys/msg.h>
 #include <sys/ipc.h>
@@ -17,7 +18,14 @@ uint8_t subsampled[3][PIX_LEN/16];
 uint8_t stored = 0;
 int qid;
 
+void handleClose(int signo){
+  msgctl(qid, IPC_RMID, NULL);
+  remove("/tmp/queue");
+  exit(1);
+}
+
 int main(int argc, char ** argv) {
+  signal(SIGTERM, handleClose);
 	FILE* f_in;
   creat("/tmp/queue", 0644);
   key_t key = ftok("/tmp/queue", 1);
@@ -26,6 +34,7 @@ int main(int argc, char ** argv) {
   if (qid == -1) {
     msg_t msg;
     msg.mtype = 1;
+    msg.len = 1;
     strcpy(msg.mtext, "exit");
     qid = msgget(key, O_RDWR|0644);
     msgsnd(qid, &msg, strlen(msg.mtext), 0);
@@ -37,7 +46,7 @@ int main(int argc, char ** argv) {
   char text[100];
   char savedName[100];
   char newname[100];
-  area_t diffDims[20];
+  area_t diffDims[1000];
   while (1) {
     msg_t msg;
     printf("pre msgrcv()\n");
@@ -87,13 +96,15 @@ int main(int argc, char ** argv) {
       if (different) {
         printf("Images are different\n");
         store(subsampled);
-        getSavedName(text, savedName);
         printf("Post store\n");
         for (int i = 0; i < different; i++) {
           // sprintf(newname, "out-%i.jpg\n",i);
           getName(text, newname, i);
-          encodeNsend(text, raw, diffDims[i]);
-          printf("Component #%i x: %i y: %i w: %i h: %i\n", i, diffDims[i].x, diffDims[i].h, diffDims[i].w, diffDims[i].h);
+          printf("area #%i\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+          enlargeAdjust(&diffDims[i]);
+          printf("\t¦\n\tV\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+          // writeDiffPpm(newname, raw, &diffDims[i]);
+          encodeNsend(newname, raw, diffDims[i]);
         }
         printf("Post encodeNsend\n");
       } else printf("Images are the same\n");
@@ -102,13 +113,16 @@ int main(int argc, char ** argv) {
       printf("No image stored\nStoring and encoding\n");
       stored = 1;
       store(subsampled);
+      printf("post store\n");
       // printf("%i\n", msg.mtext);
       getSavedName(text, savedName);
       // printf("%i\n", msg.mtext);
       area_t fullImage;
-      fullImage.x = fullImage.y = 0;
+      fullImage.x = 0;
+      fullImage.y = 0;
       fullImage.w = WIDTH;
       fullImage.h = HEIGHT;
+      printf("Dimensions: x: %i y: %i w: %i h: %i\n", fullImage.x, fullImage.y, fullImage.w, fullImage.h);
       printf("pre-encoding\n");
       // printf("%i\n", msg.mtext);
       getName(text, newname, -1);
