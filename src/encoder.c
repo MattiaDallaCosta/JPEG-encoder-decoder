@@ -221,6 +221,11 @@ void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
         last[2] += out[2][(iv*dims.w/16+ih)*32];
       }
     }
+    if (r == (dims.w - 1)){
+      printf("off : %i\n", off);
+      off += (WIDTH - dims.w);
+      printf("off : %i\n", off);
+    }
 	}
 }
 
