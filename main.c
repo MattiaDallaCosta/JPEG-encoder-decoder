@@ -97,7 +97,7 @@ int main(int argc, char ** argv) {
         printf("Images are different\n");
         store(subsampled);
         printf("Post store\n");
-        for (int i = 0; i < different; i++) {
+        if (different > 1) for (int i = 0; i < different; i++) {
           // sprintf(newname, "out-%i.jpg\n",i);
           getName(text, newname, i);
           printf("area #%i\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
@@ -106,6 +106,9 @@ int main(int argc, char ** argv) {
           // writeDiffPpm(newname, raw, &diffDims[i]);
           encodeNsend(newname, raw, diffDims[i]);
         }
+        else {
+          getName(text, newname, -1);
+          encodeNsend(newname, raw, diffDims[0]);}
         printf("Post encodeNsend\n");
       } else printf("Images are the same\n");
     } else {
