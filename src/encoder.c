@@ -178,7 +178,6 @@ void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
 }
 
 void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
-  // printf("dims x: %i y: %i w: %i h: %i\n", dims.x, dims.y, dims.w, dims.h);
   int i = 0;
   int off = dims.y*WIDTH + dims.x;
   uint8_t app[2][2*dims.w];
@@ -222,9 +221,7 @@ void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
       }
     }
     if (r == (dims.w - 1)){
-      printf("off : %i\n", off);
       off += (WIDTH - dims.w);
-      printf("off : %i\n", off);
     }
 	}
 }
@@ -659,9 +656,7 @@ void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code
 
 int writePpm(FILE * f, uint8_t sub[3][PIX_LEN/16]) {
   fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
-  printf("maxnum = %i\n\n", PIX_LEN);
   for (int i = 0; i < (PIX_LEN); i++){
-    printf("\033[1A%i\n",i);
     int w = i%(WIDTH);
     int h = i/(WIDTH);
     putc(sub[0][(h/4)*WIDTH/4+w/4], f);
@@ -676,9 +671,7 @@ int writeDiffPpm(char * filename, uint8_t sub[3][PIX_LEN], area_t * dims) {
   FILE * f = fopen(filename, "w");
   int off = WIDTH * dims->y + dims->x;
   fprintf(f, "P6\n%i %i\n255\n", dims->w, dims->h);
-  printf("maxnum = %i\n\n", dims->w*dims->h);
   for (int i = 0; i < (dims->h * dims->w); i++){
-    printf("\033[1A%i\n",i);
     int w = i%(dims->w);
     int h = i/(dims->w);
     putc(sub[0][off+h*WIDTH+w], f);
@@ -696,5 +689,4 @@ void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims) {
   rgb_to_dct(raw, ordered_dct, dims);
 	init_huffman(ordered_dct, dims, Luma, Chroma);
 	write_file(name, ordered_dct, dims, Luma, Chroma);
-  printf("encodeNsend done!\n");
 }

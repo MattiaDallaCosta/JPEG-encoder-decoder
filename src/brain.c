@@ -28,7 +28,6 @@ void subsample(uint8_t in[3][PIX_LEN], uint8_t out[3][PIX_LEN/16]) {
     appo += (in[2][(bigh+2)*WIDTH+bigw] + in[2][(bigh+2)*WIDTH+bigw+1] + in[2][(bigh+2)*WIDTH+bigw+2] + in[2][(bigh+2)*WIDTH+bigw+3]);
     appo += (in[2][(bigh+3)*WIDTH+bigw] + in[2][(bigh+3)*WIDTH+bigw+1] + in[2][(bigh+3)*WIDTH+bigw+2] + in[2][(bigh+3)*WIDTH+bigw+3]);
     out[2][i] = appo/16;
-    // printf("%i, %i, %i\n", out[0][i], out[1][i], out[2][i]);
   }
 }
 
@@ -83,10 +82,7 @@ area_t cumulativeMerge(pair_t * diffs, int index){
   a.y = diffs[index].row;
   a.h = diffs[index].row;
   diffs[index].done = 1;
-  // printf("index = %i\n", index);
   while (diffs[index].diff[i] > -1) {
-    // printf("son of %i is %i\n",index, diffs[index].diff[i]);
-    // printf("\033[1Aapp[%i] = %i %i %i %i\n", index, a.x, a.y, a.w, a.h);
     area_t app = cumulativeMerge(diffs, diffs[index].diff[i]);
     sumAreas(&a, app);
     i++;
@@ -135,25 +131,20 @@ int compare(uint8_t in[3][PIX_LEN/16], area_t outs[1000]){
       differences[numdiff+j].end = i%(WIDTH/4);
     } else {
       if (isDifferent) { 
-        printf("found difference #%i in line #%i: beg = %i, end = %i\n", numdiff+j, differences[numdiff+j].row, differences[numdiff+j].beg, differences[numdiff+j].end);
         isDifferent = 0;
         j++;
       }
     }
   }
-  printf("post diff found\n");
   if (!numdiff) return 0;
   isDifferent = 0;
   for (i = numdiff-1; i >= 0; i--) {
-    // printf("done[%i] = %i\n", i, differences[i].done);
     if(differences[i].done) continue;
     if(differences[i].row == -1 || differences[i].beg == -1 || differences[i].end == -1) continue;
     int over = 0;
     area_t a = cumulativeMerge(differences, i);
-    printf("sons of diff %i:\n",i);
     j = 0;
     while (differences[i].diff[j] > -1) {
-      printf("\t%i\n", differences[i].diff[j]);
       j++;
     }
     if (a.x == -1 || a.y == -1 || a.w == -1 || a.h == -1) continue;
@@ -161,19 +152,16 @@ int compare(uint8_t in[3][PIX_LEN/16], area_t outs[1000]){
       if (overlap(a, outs[j])) {
         sumAreas(&outs[j], a);
         over = 1;
-        printf("over[%i] = %i\n", j, over);
         break;
       }
     }
     if(!over) {
-      printf("adding\n");
       outs[isDifferent].x = a.x;
       outs[isDifferent].y = a.y;
       outs[isDifferent].w = a.w;
       outs[isDifferent].h = a.h;
       isDifferent++;
       if (isDifferent > 1000) {
-        printf("too many\n");
         return isDifferent;
       }
     }

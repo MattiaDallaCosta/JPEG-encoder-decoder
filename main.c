@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 #include "include/encoder.h"
 #include "include/brain.h"
@@ -17,6 +18,9 @@ uint8_t raw[3][PIX_LEN];
 uint8_t subsampled[3][PIX_LEN/16];
 uint8_t stored = 0;
 int qid;
+struct timeval start, end, store_t, read_t, comp_t, op_t, sub_t, appo;
+unsigned long millielapsed;
+unsigned long secelapsed;
 
 void handleClose(int signo){
   msgctl(qid, IPC_RMID, NULL);
@@ -30,14 +34,13 @@ int main(int argc, char ** argv) {
   creat("/tmp/queue", 0644);
   key_t key = ftok("/tmp/queue", 1);
   qid = msgget(key, O_RDWR|IPC_EXCL|IPC_CREAT|0644);
-  printf("%i\n", qid);
   if (qid == -1) {
     msg_t msg;
     msg.mtype = 1;
-    msg.len = 1;
+    msg.len = 0;
     strcpy(msg.mtext, "exit");
     qid = msgget(key, O_RDWR|0644);
-    msgsnd(qid, &msg, strlen(msg.mtext), 0);
+    msgsnd(qid, &msg, strlen(msg.mtext)+sizeof(msg.len), 0);
     printf("\033[0;031mClosing existing queue\033[0m\n");
     msgctl(qid, IPC_RMID, NULL);
     qid = msgget(key, O_RDWR|IPC_CREAT|0644);
@@ -49,35 +52,28 @@ int main(int argc, char ** argv) {
   area_t diffDims[1000];
   while (1) {
     msg_t msg;
-    printf("pre msgrcv()\n");
-    // printf("msgrcv = %zi\n", msgrcv(qid, &msg, 1000, 1, 0));
     msgrcv(qid, &msg, 100, 1, 0);
-    // printf("%i\n", msg.mtext);
-    perror("Error of msgrcv");
-    printf("post msgrcv()\n");
+    gettimeofday(&start, NULL);
     strcpy(text, msg.mtext);
-    printf("strlen msg: %lu\n", strlen(text));
-    printf("\n");
-    printf("message: %s %s\n",text, msg.mtext);
 
-    // printf("%i\n", msg.mtext);
-    fflush(NULL);
     if(! strcmp(text, "exit")){
       printf("\033[0;033mExititng\033[0m\n");
       msgctl(qid, IPC_RMID, NULL);
       return 0;
     }
-    // printf("%i\n", msg.mtext);
     if(strcmp(text, "saved") == 0){
       if(stored){
         printf("\033[0;032mCreating saved file\033[0m\n");
         FILE * f_sub = fopen(savedName, "w");
         writePpm(f_sub, subsampled);
         fclose(f_sub);
+        gettimeofday(&store_t, NULL);
+        millielapsed = (store_t.tv_usec - start.tv_usec)/1000;
+        secelapsed = (store_t.tv_sec - start.tv_sec)/1000;
+        printf("storing time: %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
       } else printf("\033[0;031mNo previous image stored\033[0m\n");
       continue;
     }
-    // printf("%i\n", msg.mtext);
     if (!(f_in = fopen(text, "r"))) {
       fprintf(stderr, "\033[0;031mUnable to open file\033[0m\n");
       continue;
@@ -88,55 +84,67 @@ int main(int argc, char ** argv) {
 	  	continue;
 	  }
 	  fclose(f_in);
-    // printf("%i\n", msg.mtext);
+    gettimeofday(&read_t, NULL);
+    millielapsed = (read_t.tv_usec - start.tv_usec)/1000;
+    secelapsed = (read_t.tv_sec - start.tv_sec);
+    printf("reading time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
     subsample(raw, subsampled);
+    gettimeofday(&sub_t, NULL);
+    millielapsed = (sub_t.tv_usec - read_t.tv_usec)/1000;
+    secelapsed = (sub_t.tv_sec - read_t.tv_sec)/1000;
+    printf("subsampling time:                     %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
     if(stored){
       int different = compare(subsampled, diffDims);
-      printf("%i\n", different);
+      gettimeofday(&comp_t, NULL);
+      millielapsed = (comp_t.tv_usec - sub_t.tv_usec)/1000;
+      secelapsed = (comp_t.tv_sec - sub_t.tv_sec);
+      printf("comparison time:                      %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
       if (different) {
-        printf("Images are different\n");
+        printf("\033[0;036mImages are different\033[0m\n");
         store(subsampled);
-        printf("Post store\n");
-        if (different > 1) for (int i = 0; i < different; i++) {
-          // sprintf(newname, "out-%i.jpg\n",i);
-          getName(text, newname, i);
-          printf("area #%i\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+        gettimeofday(&store_t, NULL);
+        millielapsed = (store_t.tv_usec - comp_t.tv_usec)/1000;
+        secelapsed = (store_t.tv_sec - comp_t.tv_sec);
+        printf("storing time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+        for (int i = 0; i < different; i++) {
+          gettimeofday(&appo, NULL);
+          // getName(text, newname, i);
+          sprintf(newname, "out-%i.jpg", i);
           enlargeAdjust(&diffDims[i]);
-          printf("\t¦\n\tV\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-          // writeDiffPpm(newname, raw, &diffDims[i]);
           encodeNsend(newname, raw, diffDims[i]);
+          gettimeofday(&op_t, NULL);
+          millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
+          secelapsed = (op_t.tv_sec - appo.tv_sec);
+          printf("conversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
         }
-        else {
-          getName(text, newname, -1);
-          encodeNsend(newname, raw, diffDims[0]);}
-        printf("Post encodeNsend\n");
-      } else printf("Images are the same\n");
+      } else printf("\033[0;036mImages are the same\033[0m\n");
     } else {
-      // printf("%i\n", msg.mtext);
-      printf("No image stored\nStoring and encoding\n");
+      printf("\033[0;036mNo image stored\nStoring and encoding\033[0m\n");
       stored = 1;
       store(subsampled);
-      printf("post store\n");
-      // printf("%i\n", msg.mtext);
+      gettimeofday(&store_t, NULL);
+      millielapsed = (store_t.tv_usec - sub_t.tv_usec)/1000;
+      secelapsed = (store_t.tv_sec - sub_t.tv_sec);
+      printf("storing time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
       getSavedName(text, savedName);
-      // printf("%i\n", msg.mtext);
       area_t fullImage;
       fullImage.x = 0;
       fullImage.y = 0;
       fullImage.w = WIDTH;
       fullImage.h = HEIGHT;
-      printf("Dimensions: x: %i y: %i w: %i h: %i\n", fullImage.x, fullImage.y, fullImage.w, fullImage.h);
-      printf("pre-encoding\n");
-      // printf("%i\n", msg.mtext);
       getName(text, newname, -1);
-      // printf("%i\n", msg.mtext);
-      // strcpy(newname, "out.jpg");
       encodeNsend(newname, raw, fullImage);
-      // printf("%i\n", msg.mtext);
+      gettimeofday(&op_t, NULL);
+      millielapsed = (op_t.tv_usec - store_t.tv_usec)/1000;
+      secelapsed = (op_t.tv_sec - store_t.tv_sec);
+      printf("conversion time for full image:       %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
     }
-    printf("Done\n");
-    sleep(1);
-    // printf("%i\n", msg.mtext);
+    gettimeofday(&end, NULL);
+    millielapsed = (end.tv_usec - start.tv_usec)/1000;
+    secelapsed = (end.tv_sec - start.tv_sec);
+    printf("comparison and conversion total time: %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+    printf("\033[0;36mDone\033[0m\n");
+    // sleep(1);
   }
 	return 0;
 }
