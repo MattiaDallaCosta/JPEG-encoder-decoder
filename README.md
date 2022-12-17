@@ -1,6 +1,6 @@
 # Encoder
 ## Execution:
- run: ``
+ run ``
  make
  ``
  to build, then run 
