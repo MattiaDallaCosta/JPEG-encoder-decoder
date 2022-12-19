@@ -1,17 +1,21 @@
 #include "esp_camera.h"
+#include "img_converters.h"
 extern "C" {
 #include "include/define.h"
 #include "include/encoder.h"
 #include "include/brain.h"
 #include "include/structs.h"
 }
-//uint8_t raw[3][PIX_LEN];
+
+camera_fb_t *fb;
+uint8_t *raw;
 uint8_t subsampled[3][PIX_LEN/16];
 int state = LOW;
 char text[100];
 char savedName[100];
 char newname[100];
 area_t diffDims[20];
+uint8_t different;
 
 void setup() {
   Serial.begin(9600);
@@ -39,51 +43,59 @@ void setup() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.frame_size = FRAMESIZE_QVGA;
-  config.pixel_format = PIXFORMAT_RGB565;
+  config.pixel_format = PIXFORMAT_JPEG;
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
   config.fb_count = 1;
 
-  if(!psramFound()) {
-      Serial.println("\r\nFatal Error; Halting");
-      Serial.println("No PSRAM found; camera cannot be initialised: Please check the board config for your module.");
-      return;
-  }
-
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x", err);
+    Serial.printf("Camera init failed with error 0x%x\n", err);
     return;
   } 
-  Serial.printf("Camera initialized succesfully");
-  sensor_t * s = esp_camera_sensor_get();
+  Serial.printf("Camera initialized succesfully\n");
 
+  fb = esp_camera_fb_get();
+  raw = (uint8_t*)ps_malloc(3*PIX_LEN);
+  fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+  esp_camera_fb_return(fb);
+  fb = NULL;
+  subsample(raw, subsampled);
+  free(raw);
+  store(subsampled);
+  Serial.printf("saved first image\n");
 }
 
 void loop() {
   Serial.printf("BenDio 1\n");
-  camera_fb_t *fb = esp_camera_fb_get();
-    Serial.printf("BenDio 2\n");
-    // put image into raw
-  subsample(fb->buf, subsampled);
+  fb = esp_camera_fb_get();
+  raw = (uint8_t*)ps_malloc(3*PIX_LEN);
+  fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+  esp_camera_fb_return(fb);
+  fb = NULL;
+  Serial.printf("BenDio 2\n");
+  subsample(raw, subsampled);
   Serial.printf("BenDio 3\n");
-  uint8_t different = compare(subsampled, diffDims);
+  Serial.printf("BenDio 3\n");
+  different = compare(subsampled, diffDims);
+  Serial.printf("%i\n", different);
   Serial.printf("BenDio 4\n");
   Serial.printf("different %i\n", different);
   if (different) {
-      printf("Images are different\n");
+      Serial.printf("Images are different\n");
       for (int i = 0; i < different; i++) {
         getName(text, newname, i);
         Serial.printf("area #%i\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
         enlargeAdjust(&diffDims[i]);
         Serial.printf("\t¦\n\tV\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-        encodeNsend(newname, fb->buf, diffDims[i]);
+        encodeNsend(newname, raw, diffDims[i]);
       }
       Serial.printf("Post encodeNsend\n");
     } else Serial.printf("Images are the same\n");
     store(subsampled);    
     delay(100);
+    free(raw);
     state = state == LOW ? HIGH : LOW;
     digitalWrite(33, state);
   Serial.printf("BenDio 2\n");
