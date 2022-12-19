@@ -1,1 +1,1 @@
-# JPEG-encoder-decoder
+# Thesis Project
