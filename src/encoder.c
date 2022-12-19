@@ -177,7 +177,7 @@ void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
 	}
 }
 
-void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
+void rgb_to_dct(uint8_t *in, int16_t out[3][PIX_LEN], area_t dims) {
   // printf("dims x: %i y: %i w: %i h: %i\n", dims.x, dims.y, dims.w, dims.h);
   int i = 0;
   int off = dims.y*WIDTH + dims.x;
@@ -190,9 +190,9 @@ void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
     int r = i%dims.w;
     int l = i/dims.w;
 		// mid[0][(l%8)*WIDTH+r]                =       0.299    * in[0][i] + 0.587    * in[1][i] + 0.114    * in[2][i];
-		mid[0][i]              =       0.299    * in[0][i+off] + 0.587    * in[1][i+off] + 0.114    * in[2][i+off];
-		app[0][(l%2)*dims.w+r] = 128 - 0.168736 * in[0][i+off] - 0.331264 * in[1][i+off] + 0.5      * in[2][i+off];
-		app[1][(l%2)*dims.w+r] = 128 + 0.5      * in[0][i+off] - 0.418688 * in[1][i+off] - 0.081312 * in[2][i+off];
+		mid[0][i]              =       0.299    * in[3*(i+off)] + 0.587    * in[3*(i+off)+1] + 0.114    * in[3*(i+off)+2];
+		app[0][(l%2)*dims.w+r] = 128 - 0.168736 * in[3*(i+off)] - 0.331264 * in[3*(i+off)+1] + 0.5      * in[3*(i+off)+2];
+		app[1][(l%2)*dims.w+r] = 128 + 0.5      * in[3*(i+off)] - 0.418688 * in[3*(i+off)+1] - 0.081312 * in[3*(i+off)+2];
     if (r%2 == 1 && l%2 == 1) {
 			 mid[1][(l/2*dims.w)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][dims.w+r-1] + app[0][dims.w+r])/4;
 			 mid[2][(l/2*dims.w)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][dims.w+r-1] + app[1][dims.w+r])/4;
@@ -689,7 +689,7 @@ int writeDiffPpm(char * filename, uint8_t sub[3][PIX_LEN], area_t * dims) {
   return 0;
 }
 
-void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims) {
+void encodeNsend(char * name, uint8_t *raw, area_t dims) {
   int16_t ordered_dct[3][PIX_LEN];
   huff_code Luma[2];
   huff_code Chroma[2];
