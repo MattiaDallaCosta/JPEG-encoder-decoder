@@ -5,10 +5,9 @@
 #include <strings.h>
 #include <unistd.h>
 
-int saved[3][PIX_LEN/16] = { 0 };
+uint8_t saved[3*PIX_LEN/16] = { 0 };
 
-void subsample(uint8_t *in, uint8_t out[3][PIX_LEN/16]) {
-  printf("in subsample\n");
+void subsample(uint8_t *in, uint8_t *out) {
   int i = 0;
   uint16_t appo;
   uint8_t bigh;
@@ -20,28 +19,26 @@ void subsample(uint8_t *in, uint8_t out[3][PIX_LEN/16]) {
     appo += (in[3*((bigh+1)*WIDTH+bigw)] + in[3*((bigh+1)*WIDTH+bigw+1)] + in[3*((bigh+1)*WIDTH+bigw+2)] + in[3*((bigh+1)*WIDTH+bigw+3)]);
     appo += (in[3*((bigh+2)*WIDTH+bigw)] + in[3*((bigh+2)*WIDTH+bigw+1)] + in[3*((bigh+2)*WIDTH+bigw+2)] + in[3*((bigh+2)*WIDTH+bigw+3)]);
     appo += (in[3*((bigh+3)*WIDTH+bigw)] + in[3*((bigh+3)*WIDTH+bigw+1)] + in[3*((bigh+3)*WIDTH+bigw+2)] + in[3*((bigh+3)*WIDTH+bigw+3)]);
-    out[0][i] = appo/16;
+    out[3*i] = appo/16;
     appo =  (in[3*(bigh*WIDTH+bigw)+1]     + in[3*(bigh*WIDTH+bigw+1)+1]     + in[3*(bigh*WIDTH+bigw+2)+1]     + in[3*(bigh*WIDTH+bigw+3)+1]);
     appo += (in[3*((bigh+1)*WIDTH+bigw)+1] + in[3*((bigh+1)*WIDTH+bigw+1)+1] + in[3*((bigh+1)*WIDTH+bigw+2)+1] + in[3*((bigh+1)*WIDTH+bigw+3)+1]);
     appo += (in[3*((bigh+2)*WIDTH+bigw)+1] + in[3*((bigh+2)*WIDTH+bigw+1)+1] + in[3*((bigh+2)*WIDTH+bigw+2)+1] + in[3*((bigh+2)*WIDTH+bigw+3)+1]);
     appo += (in[3*((bigh+3)*WIDTH+bigw)+1] + in[3*((bigh+3)*WIDTH+bigw+1)+1] + in[3*((bigh+3)*WIDTH+bigw+2)+1] + in[3*((bigh+3)*WIDTH+bigw+3)+1]);
-    out[1][i] = appo/16;
+    out[3*i+1] = appo/16;
     appo =  (in[3*(bigh*WIDTH+bigw)+2]     + in[3*(bigh*WIDTH+bigw+1)+2]     + in[3*(bigh*WIDTH+bigw+2)+2]     + in[3*(bigh*WIDTH+bigw+3)+2]);
     appo += (in[3*((bigh+1)*WIDTH+bigw)+2] + in[3*((bigh+1)*WIDTH+bigw+1)+2] + in[3*((bigh+1)*WIDTH+bigw+2)+2] + in[3*((bigh+1)*WIDTH+bigw+3)+2]);
     appo += (in[3*((bigh+2)*WIDTH+bigw)+2] + in[3*((bigh+2)*WIDTH+bigw+1)+2] + in[3*((bigh+2)*WIDTH+bigw+2)+2] + in[3*((bigh+2)*WIDTH+bigw+3)+2]);
     appo += (in[3*((bigh+3)*WIDTH+bigw)+2] + in[3*((bigh+3)*WIDTH+bigw+1)+2] + in[3*((bigh+3)*WIDTH+bigw+2)+2] + in[3*((bigh+3)*WIDTH+bigw+3)+2]);
-    out[2][i] = appo/16;
+    out[3*i+2] = appo/16;
   }
-  printf("post subsample\n");
 }
 
-void store(uint8_t in[3][PIX_LEN/16]) {
+void store(uint8_t *in) {
   int i = 0;
   for(; i < PIX_LEN/16; i++) {
-    saved[0][i] = in[0][i];
-    saved[1][i] = in[1][i];
-    saved[2][i] = in[2][i];
-    usleep(500);
+    saved[i+0] = in[i];
+    saved[i+1] = in[i+1];
+    saved[i+2] = in[i+2];
   }
 }
 
@@ -97,7 +94,7 @@ area_t cumulativeMerge(pair_t * diffs, int index){
   return a;
 }
 
-int compare(uint8_t in[3][PIX_LEN/16], area_t outs[20]){
+int compare(uint8_t *in, area_t outs[20]){
   printf("in compare\n\n");
   int isDifferent = 0;
   pair_t differences[PIX_LEN/32];
@@ -125,7 +122,7 @@ int compare(uint8_t in[3][PIX_LEN/16], area_t outs[20]){
       oldj = j;
       j = 0;
     }
-    if (in[0][i] != saved[0][i] || in[1][i] != saved[1][i] || in[2][i] != saved[2][i]) {
+    if (in[i] != saved[i] || in[i+1] != saved[i+1] || in[i+2] != saved[i+2]) {
       if(!isDifferent) {
         isDifferent = 1;
         differences[numdiff+j].beg = i%(WIDTH/4);

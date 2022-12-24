@@ -1,102 +1,292 @@
+#include <WiFi.h>
+#include <AsyncTelegram2.h>
 #include "esp_camera.h"
 #include "img_converters.h"
-extern "C" {
-#include "include/define.h"
-#include "include/encoder.h"
+#include "soc/soc.h"           // Brownout error fix
+#include "soc/rtc_cntl_reg.h"  // Brownout error fix
+
+#include <WiFiClientSecure.h>
+WiFiClientSecure client;
+
 #include "include/brain.h"
 #include "include/structs.h"
+#include "include/encoder.h"
+
+uint8_t *raw;
+uint8_t *sub;
+uint8_t *jpg;
+area_t diffDims[20];
+int len = 0;
+
+const char* ssid = "Mi 11";  // SSID WiFi network
+const char* pass = "00000000";  // Password  WiFi network
+const char* token = "5891807658:AAFgQDuxotPpZaP_a5bZ5FJj7XPrmKGByKo";
+
+// Check the userid with the help of bot @JsonDumpBot or @getidsbot (work also with groups)
+// https://t.me/JsonDumpBot  or  https://t.me/getidsbot
+int64_t userid = 1234567890;
+uint8_t flashval = 10;
+bool changingFlash = 0;
+
+// Timezone definition to get properly time from NTP server
+#define MYTZ "CET-1CEST,M3.5.0,M10.5.0/3"
+
+AsyncTelegram2 myBot(client);
+
+#define PWDN_GPIO_NUM 32
+#define RESET_GPIO_NUM -1
+#define XCLK_GPIO_NUM 0
+#define SIOD_GPIO_NUM 26
+#define SIOC_GPIO_NUM 27
+
+#define Y9_GPIO_NUM 35
+#define Y8_GPIO_NUM 34
+#define Y7_GPIO_NUM 39
+#define Y6_GPIO_NUM 36
+#define Y5_GPIO_NUM 21
+#define Y4_GPIO_NUM 19
+#define Y3_GPIO_NUM 18
+#define Y2_GPIO_NUM 5
+#define VSYNC_GPIO_NUM 25
+#define HREF_GPIO_NUM 23
+#define PCLK_GPIO_NUM 22
+
+#define LAMP_PIN 4
+
+static camera_config_t camera_config = {
+  .pin_pwdn = PWDN_GPIO_NUM,
+  .pin_reset = RESET_GPIO_NUM,
+  .pin_xclk = XCLK_GPIO_NUM,
+  .pin_sscb_sda = SIOD_GPIO_NUM,
+  .pin_sscb_scl = SIOC_GPIO_NUM,
+  .pin_d7 = Y9_GPIO_NUM,
+  .pin_d6 = Y8_GPIO_NUM,
+  .pin_d5 = Y7_GPIO_NUM,
+  .pin_d4 = Y6_GPIO_NUM,
+  .pin_d3 = Y5_GPIO_NUM,
+  .pin_d2 = Y4_GPIO_NUM,
+  .pin_d1 = Y3_GPIO_NUM,
+  .pin_d0 = Y2_GPIO_NUM,
+  .pin_vsync = VSYNC_GPIO_NUM,
+  .pin_href = HREF_GPIO_NUM,
+  .pin_pclk = PCLK_GPIO_NUM,  
+  .xclk_freq_hz = 20000000,        //XCLK 20MHz or 10MHz
+  .ledc_timer = LEDC_TIMER_0,
+  .ledc_channel = LEDC_CHANNEL_0,
+  .pixel_format = PIXFORMAT_JPEG,  //YUV422,GRAYSCALE,RGB565,JPEG
+  .frame_size = FRAMESIZE_HVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
+  .jpeg_quality = 11,              //0-63 lower number means higher quality
+  .fb_count = 1,                   //if more than one, i2s runs in continuous mode. Use only with JPEG
+  .grab_mode = CAMERA_GRAB_WHEN_EMPTY
+};
+
+
+int lampChannel = 7;           // a free PWM channel (some channels used by camera)
+const int pwmfreq = 50000;     // 50K pwm frequency
+const int pwmresolution = 9;   // duty cycle bit range
+const int pwmMax = pow(2,pwmresolution)-1;
+
+// Lamp Control
+void setLamp(int newVal) {
+    if (newVal != -1) {
+        // Apply a logarithmic function to the scale.
+        int brightness = round((pow(2,(1+(newVal*0.02)))-2)/6*pwmMax);
+        ledcWrite(lampChannel, brightness);
+        Serial.print("Lamp: ");
+        Serial.print(newVal);
+        Serial.print("%, pwm = ");
+        Serial.println(brightness);
+    }
 }
 
-camera_fb_t *fb;
-uint8_t *raw;
-uint8_t subsampled[3][PIX_LEN/16];
-int state = LOW;
-char text[100];
-char savedName[100];
-char newname[100];
-area_t diffDims[20];
-uint8_t different;
+static esp_err_t init_camera() {
+  //initialize the camera
+  Serial.print("Camera init... ");
+  esp_err_t err = esp_camera_init(&camera_config);
 
-void setup() {
-  Serial.begin(9600);
-  Serial.setDebugOutput(true);
-  pinMode(33, OUTPUT);
-
-  camera_config_t config;
-  config.ledc_channel = LEDC_CHANNEL_1;
-  config.ledc_timer = LEDC_TIMER_0;
-  config.pin_d0 = Y2_GPIO_NUM;
-  config.pin_d1 = Y3_GPIO_NUM;
-  config.pin_d2 = Y4_GPIO_NUM;
-  config.pin_d3 = Y5_GPIO_NUM;
-  config.pin_d4 = Y6_GPIO_NUM;
-  config.pin_d5 = Y7_GPIO_NUM;
-  config.pin_d6 = Y8_GPIO_NUM;
-  config.pin_d7 = Y9_GPIO_NUM;
-  config.pin_xclk = XCLK_GPIO_NUM;
-  config.pin_pclk = PCLK_GPIO_NUM;
-  config.pin_vsync = VSYNC_GPIO_NUM;
-  config.pin_href = HREF_GPIO_NUM;
-  config.pin_sscb_sda = SIOD_GPIO_NUM;
-  config.pin_sscb_scl = SIOC_GPIO_NUM;
-  config.pin_pwdn = PWDN_GPIO_NUM;
-  config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_QVGA;
-  config.pixel_format = PIXFORMAT_JPEG;
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
-  config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.jpeg_quality = 12;
-  config.fb_count = 1;
-
-  esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x\n", err);
-    return;
-  } 
-  Serial.printf("Camera initialized succesfully\n");
+    delay(100);  // need a delay here or the next serial o/p gets missed
+    Serial.printf("\n\nCRITICAL FAILURE: Camera sensor failed to initialise.\n\n");
+    Serial.printf("A full (hard, power off/on) reboot will probably be needed to recover from this.\n");
+    return err;
+  } else {
+    Serial.println("succeeded");
 
-  fb = esp_camera_fb_get();
+    // Get a reference to the sensor
+    sensor_t* s = esp_camera_sensor_get();
+
+    // Dump camera module, warn for unsupported modules.
+    switch (s->id.PID) {
+      case OV9650_PID: Serial.println("WARNING: OV9650 camera module is not properly supported, will fallback to OV2640 operation"); break;
+      case OV7725_PID: Serial.println("WARNING: OV7725 camera module is not properly supported, will fallback to OV2640 operation"); break;
+      case OV2640_PID: Serial.println("OV2640 camera module detected"); break;
+      case OV3660_PID: Serial.println("OV3660 camera module detected"); break;
+      default: Serial.println("WARNING: Camera module is unknown and not properly supported, will fallback to OV2640 operation");
+    }
+  }
+  return ESP_OK;
+}
+
+void taskCheck(void * parameter) {
+  TBMessage msg;
   raw = (uint8_t*)ps_malloc(3*PIX_LEN);
+  setLamp(flashval);
+  camera_fb_t* fb = esp_camera_fb_get();
+  esp_camera_fb_return(fb);
+  fb = esp_camera_fb_get();
+  setLamp(0);
   fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+  subsample(raw,sub);
+  uint8_t different = compare(sub, diffDims);
+  store(sub);
+  free(sub);
+  Serial.printf("%i\n", different);
+  if (different) {
+    Serial.printf("Images are different\n");
+    for (int i = 0; i < different; i++) {
+      Serial.printf("area #%i\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+      enlargeAdjust(&diffDims[i]);
+      Serial.printf("\t¦\n\tV\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+      jpg = (uint8_t*)ps_malloc(3*diffDims[i].w*diffDims[i].h);
+      len = encodeNsend(jpg, raw, diffDims[i]);
+      if (!len) continue;
+      myBot.sendPhoto(msg, jpg, len);
+      len = 0;
+      free(jpg);
+    }
+    Serial.printf("Post encodeNsend\n");
+  } else Serial.printf("Images are the same\n");
+  free(raw);
+}
+
+void setFlash(TBMessage& msg) {
+  Serial.println("Changing flash value");
+  myBot.sendMessage(msg, "Which is the new intensity? [values beween 0 and 100]");
+  changingFlash = true;
+}
+
+size_t sendPicture(TBMessage& msg) {
+  // Take Picture with Camera;
+  Serial.println("Camera capture requested");
+
+  // Take picture with Camera and send to Telegram
+  setLamp(flashval);
+  camera_fb_t* fb = esp_camera_fb_get();
+  esp_camera_fb_return(fb);
+  fb = esp_camera_fb_get();
+  setLamp(0);
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    return 0;
+  }
+  size_t len = fb->len;
+  if (!myBot.sendPhoto(msg, fb->buf, fb->len)){
+    len = 0;
+    myBot.sendMessage(msg, "Error! Picture not sent.");
+  }
+  // Clear buffer
   esp_camera_fb_return(fb);
   fb = NULL;
-  subsample(raw, subsampled);
+  return len;
+}
+
+void setup() {  
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);       // disable brownout detector
+  pinMode(LAMP_PIN, OUTPUT);                       // set the lamp pin as output 
+  ledcSetup(lampChannel, pwmfreq, pwmresolution);  // configure LED PWM channel
+  setLamp(0);                                      // set default value  
+  ledcAttachPin(LAMP_PIN, lampChannel);            // attach the GPIO pin to the channel
+
+  Serial.begin(115200);
+  Serial.println();
+  xTaskCreate(taskCheck, "taskCheck", 10000, NULL, 1, NULL);
+
+  // Start WiFi connection
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println(WiFi.localIP());
+
+  // Sync time with NTP
+  configTzTime(MYTZ, "time.google.com", "time.windows.com", "pool.ntp.org");
+  client.setCACert(telegram_cert);
+
+  // Set the Telegram bot properies
+  myBot.setUpdateTime(1000);
+  myBot.setTelegramToken(token);
+
+  // Check if all things are ok
+  Serial.print("\nTest Telegram connection... ");
+  myBot.begin() ? Serial.println("OK") : Serial.println("NOK");
+
+  // Send a welcome message to user when ready
+  char welcome_msg[64];
+  snprintf(welcome_msg, 64, "BOT @%s online.\nTry with /takePhoto command.", myBot.getBotName());
+  myBot.sendTo(userid, welcome_msg);
+
+  // Init the camera module (accordind the camera_config_t defined)
+  init_camera();
+
+  raw = (uint8_t*)ps_malloc(3*PIX_LEN);
+  sub = (uint8_t*)ps_malloc(3*PIX_LEN/16);
+  setLamp(flashval);
+  camera_fb_t* fb = esp_camera_fb_get();
+  esp_camera_fb_return(fb);
+  fb = esp_camera_fb_get();
+  setLamp(0);
+  fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+  subsample(raw, sub);
+  store(sub);
   free(raw);
-  store(subsampled);
-  Serial.printf("saved first image\n");
+  free(sub);
 }
 
 void loop() {
-  Serial.printf("BenDio 1\n");
-  fb = esp_camera_fb_get();
-  raw = (uint8_t*)ps_malloc(3*PIX_LEN);
-  fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
-  esp_camera_fb_return(fb);
-  fb = NULL;
-  Serial.printf("BenDio 2\n");
-  subsample(raw, subsampled);
-  Serial.printf("BenDio 3\n");
-  Serial.printf("BenDio 3\n");
-  different = compare(subsampled, diffDims);
-  Serial.printf("%i\n", different);
-  Serial.printf("BenDio 4\n");
-  Serial.printf("different %i\n", different);
-  if (different) {
-      Serial.printf("Images are different\n");
-      for (int i = 0; i < different; i++) {
-        getName(text, newname, i);
-        Serial.printf("area #%i\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-        enlargeAdjust(&diffDims[i]);
-        Serial.printf("\t¦\n\tV\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-        encodeNsend(newname, raw, diffDims[i]);
-      }
-      Serial.printf("Post encodeNsend\n");
-    } else Serial.printf("Images are the same\n");
-    store(subsampled);    
-    delay(100);
-    free(raw);
-    state = state == LOW ? HIGH : LOW;
-    digitalWrite(33, state);
-  Serial.printf("BenDio 2\n");
-}
+  // A variable to store telegram message data
+  TBMessage msg;
+  // if there is an incoming message...
+  if (myBot.getNewMessage(msg)) {
+    Serial.print("New message from chat_id: ");
+    Serial.println(msg.sender.id);
+    MessageType msgType = msg.messageType;
+    // Received a text message
+    if (msgType == MessageText) {
+      if (changingFlash) {
+        int8_t newval = atoi(msg.text.c_str());
+        if(newval >= 0 && newval <= 100) {
+          flashval = newval;
+          Serial.printf("Flash intensity set to %i\n", flashval);
+          String replyStr = "Flash intensity set to ";
+          replyStr += std::to_string(flashval).c_str();
+          myBot.sendMessage(msg, replyStr);      
+        } else {
+          myBot.sendMessage(msg, "Invalid flash value try values between 0 and 100");
+          Serial.printf("invalid flash value\n");
+        }
+        changingFlash = 0;
+      } else {
+        if (msg.text.equalsIgnoreCase("/takePhoto")) {
+          Serial.println("\nSending Photo from CAM");
+          if (sendPicture(msg))
+              Serial.println("Picture sent successfull");
+          else myBot.sendMessage(msg, "Error, picture not sent.");
+        } else if (msg.text.equalsIgnoreCase("/changeFlash")) {
+          Serial.println("\nchanging flash intensity");
+          setFlash(msg);
+        } else {
+          Serial.print("\nText message received: ");
+          Serial.println(msg.text);
+          String replyStr = "Message received:\n";
+          replyStr += msg.text;
+          replyStr += "\nTry with /takePhoto to take a picture\n";
+          replyStr += "Try with /changeFlash to change the flash brightness";
+          myBot.sendMessage(msg, replyStr);
+        }
+      }     
+    }
+  }
+}  

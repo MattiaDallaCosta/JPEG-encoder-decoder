@@ -9,4 +9,4 @@
 
 void getSavedName(char *name, char *buff);
 void getName(char *name, char *buff, int num);
-void encodeNsend(char * name, uint8_t *raw, area_t dims);
+size_t encodeNsend(uint8_t *jpg, uint8_t *raw, area_t dims);
