@@ -4,6 +4,6 @@
 #include <stdint.h>
 
 void subsample(uint8_t *in, uint8_t *out);
-void store(uint8_t *in);
-int compare(uint8_t *in, area_t outs[20]);
+void store(uint8_t *in, uint8_t saved[3*PIX_LEN/16]);
+uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t outs[20]);
 void enlargeAdjust(area_t * a);

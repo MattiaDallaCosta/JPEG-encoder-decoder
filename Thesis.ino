@@ -8,15 +8,18 @@
 #include <WiFiClientSecure.h>
 WiFiClientSecure client;
 
+extern "C" {
 #include "include/brain.h"
-#include "include/structs.h"
 #include "include/encoder.h"
+}
 
 uint8_t *raw;
 uint8_t *sub;
 uint8_t *jpg;
+uint8_t saved[3*PIX_LEN/16];
 area_t diffDims[20];
 int len = 0;
+uint8_t different = 0;
 
 const char* ssid = "Mi 11";  // SSID WiFi network
 const char* pass = "00000000";  // Password  WiFi network
@@ -25,7 +28,7 @@ const char* token = "5891807658:AAFgQDuxotPpZaP_a5bZ5FJj7XPrmKGByKo";
 // Check the userid with the help of bot @JsonDumpBot or @getidsbot (work also with groups)
 // https://t.me/JsonDumpBot  or  https://t.me/getidsbot
 int64_t userid = 1234567890;
-uint8_t flashval = 10;
+uint8_t flashval = 1;
 bool changingFlash = 0;
 
 // Timezone definition to get properly time from NTP server
@@ -132,13 +135,27 @@ void taskCheck(void * parameter) {
   raw = (uint8_t*)ps_malloc(3*PIX_LEN);
   setLamp(flashval);
   camera_fb_t* fb = esp_camera_fb_get();
+  Serial.printf("first get\n");  
   esp_camera_fb_return(fb);
   fb = esp_camera_fb_get();
+  Serial.printf("second get\n"); 
   setLamp(0);
+  Serial.printf("pre conversion\n");
   fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+  Serial.printf("post conversion\n");
+  esp_camera_fb_return(fb);
+  Serial.printf("pre sub\n");
   subsample(raw,sub);
-  uint8_t different = compare(sub, diffDims);
-  store(sub);
+  Serial.printf("post sub\n");
+
+  different = compare(sub, saved, diffDims);
+  //diffDims[0].x = 2;
+  //diffDims[0].y = 2;
+  //diffDims[0].h = 2;
+  //diffDims[0].w = 2;
+  //uint8_t different = 1;
+  Serial.printf("post compare: different = %i\n", different);
+  store(sub, saved);
   free(sub);
   Serial.printf("%i\n", different);
   if (different) {
@@ -199,7 +216,7 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println();
-  xTaskCreate(taskCheck, "taskCheck", 10000, NULL, 1, NULL);
+  // xTaskCreate(taskCheck, "taskCheck", 10000, NULL, 1, NULL);
 
   // Start WiFi connection
   WiFi.begin(ssid, pass);
@@ -235,12 +252,16 @@ void setup() {
   sub = (uint8_t*)ps_malloc(3*PIX_LEN/16);
   setLamp(flashval);
   camera_fb_t* fb = esp_camera_fb_get();
+  Serial.printf("taken photo\n");
   esp_camera_fb_return(fb);
   fb = esp_camera_fb_get();
   setLamp(0);
   fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+  esp_camera_fb_return(fb);
+  Serial.printf("post jpg to rgb\n");
   subsample(raw, sub);
-  store(sub);
+  store(sub, saved);
+  Serial.printf("post store\n");
   free(raw);
   free(sub);
 }
@@ -271,9 +292,10 @@ void loop() {
       } else {
         if (msg.text.equalsIgnoreCase("/takePhoto")) {
           Serial.println("\nSending Photo from CAM");
-          if (sendPicture(msg))
-              Serial.println("Picture sent successfull");
-          else myBot.sendMessage(msg, "Error, picture not sent.");
+          //if (sendPicture(msg))
+          //    Serial.println("Picture sent successfull");
+          //else myBot.sendMessage(msg, "Error, picture not sent.");
+          taskCheck(NULL);
         } else if (msg.text.equalsIgnoreCase("/changeFlash")) {
           Serial.println("\nchanging flash intensity");
           setFlash(msg);

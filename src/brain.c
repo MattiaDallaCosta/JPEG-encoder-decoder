@@ -5,8 +5,6 @@
 #include <strings.h>
 #include <unistd.h>
 
-uint8_t saved[3*PIX_LEN/16] = { 0 };
-
 void subsample(uint8_t *in, uint8_t *out) {
   int i = 0;
   uint16_t appo;
@@ -33,7 +31,7 @@ void subsample(uint8_t *in, uint8_t *out) {
   }
 }
 
-void store(uint8_t *in) {
+void store(uint8_t *in, uint8_t saved[3*PIX_LEN/16]) {
   int i = 0;
   for(; i < PIX_LEN/16; i++) {
     saved[i+0] = in[i];
@@ -94,8 +92,8 @@ area_t cumulativeMerge(pair_t * diffs, int index){
   return a;
 }
 
-int compare(uint8_t *in, area_t outs[20]){
-  printf("in compare\n\n");
+uint8_t compare(uint8_t *in,uint8_t saved[3*PIX_LEN/16], area_t outs[20]){
+  printf("in compare\n");
   int isDifferent = 0;
   pair_t differences[PIX_LEN/32];
   for (int i = 0; i < PIX_LEN/32; i++) {
