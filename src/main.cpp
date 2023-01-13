@@ -14,11 +14,11 @@ extern "C" {
 #include "encoder.h"
 }
 
-uint8_t *raw;
-uint8_t *sub;
+EXT_RAM_ATTR uint8_t raw[3*PIX_LEN];
+//EXT_RAM_ATTR uint8_t sub[3*PIX_LEN/16];
 uint8_t *jpg;
-uint8_t saved[3*PIX_LEN/16];
-area_t diffDims[20];
+//EXT_RAM_ATTR uint8_t saved[3*PIX_LEN/16];
+EXT_RAM_ATTR area_t diffDims[20];
 int len = 0;
 uint8_t different = 0;
 
@@ -78,7 +78,7 @@ static camera_config_t camera_config = {
   .ledc_timer = LEDC_TIMER_0,
   .ledc_channel = LEDC_CHANNEL_0,
   .pixel_format = PIXFORMAT_JPEG,  //YUV422,GRAYSCALE,RGB565,JPEG
-  .frame_size = FRAMESIZE_HVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
+  .frame_size = FRAMESIZE_QVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
   .jpeg_quality = 11,              //0-63 lower number means higher quality
   .fb_count = 1,                   //if more than one, i2s runs in continuous mode. Use only with JPEG
   .grab_mode = CAMERA_GRAB_WHEN_EMPTY
@@ -131,51 +131,51 @@ static esp_err_t init_camera() {
   return ESP_OK;
 }
 
-void taskCheck(void * parameter) {
-  TBMessage msg;
-  raw = (uint8_t*)ps_malloc(3*PIX_LEN);
-  setLamp(flashval);
-  camera_fb_t* fb = esp_camera_fb_get();
-  Serial.printf("first get\n");  
-  esp_camera_fb_return(fb);
-  fb = esp_camera_fb_get();
-  Serial.printf("second get\n"); 
-  setLamp(0);
-  Serial.printf("pre conversion\n");
-  fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
-  Serial.printf("post conversion\n");
-  esp_camera_fb_return(fb);
-  Serial.printf("pre sub\n");
-  subsample(raw,sub);
-  Serial.printf("post sub\n");
+// void taskCheck(void * parameter) {
+//   TBMessage msg;
+//   //raw = (uint8_t*)ps_malloc(3*PIX_LEN);
+//   setLamp(flashval);
+//   camera_fb_t* fb = esp_camera_fb_get();
+//   Serial.printf("first get\n");  
+//   esp_camera_fb_return(fb);
+//   fb = esp_camera_fb_get();
+//   Serial.printf("second get\n"); 
+//   setLamp(0);
+//   Serial.printf("pre conversion\n");
+//   fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+//   Serial.printf("post conversion\n");
+//   esp_camera_fb_return(fb);
+//   Serial.printf("pre sub\n");
+//   subsample(raw,sub);
+//   Serial.printf("post sub\n");
 
-  different = compare(sub, saved, diffDims);
-  //diffDims[0].x = 2;
-  //diffDims[0].y = 2;
-  //diffDims[0].h = 2;
-  //diffDims[0].w = 2;
-  //uint8_t different = 1;
-  Serial.printf("post compare: different = %i\n", different);
-  store(sub, saved);
-  free(sub);
-  Serial.printf("%i\n", different);
-  if (different) {
-    Serial.printf("Images are different\n");
-    for (int i = 0; i < different; i++) {
-      Serial.printf("area #%i\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-      enlargeAdjust(&diffDims[i]);
-      Serial.printf("\t¦\n\tV\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-      jpg = (uint8_t*)ps_malloc(3*diffDims[i].w*diffDims[i].h);
-      len = encodeNsend(jpg, raw, diffDims[i]);
-      if (!len) continue;
-      myBot.sendPhoto(msg, jpg, len);
-      len = 0;
-      free(jpg);
-    }
-    Serial.printf("Post encodeNsend\n");
-  } else Serial.printf("Images are the same\n");
-  free(raw);
-}
+//   different = compare(sub, saved, diffDims);
+//   //diffDims[0].x = 2;
+//   //diffDims[0].y = 2;
+//   //diffDims[0].h = 2;
+//   //diffDims[0].w = 2;
+//   //uint8_t different = 1;
+//   Serial.printf("post compare: different = %i\n", different);
+//   store(sub, saved);
+//   //free(sub);
+//   Serial.printf("%i\n", different);
+//   if (different) {
+//     Serial.printf("Images are different\n");
+//     for (int i = 0; i < different; i++) {
+//       Serial.printf("area #%i\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+//       enlargeAdjust(&diffDims[i]);
+//       Serial.printf("\t¦\n\tV\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+//       jpg = (uint8_t*)ps_malloc(3*diffDims[i].w*diffDims[i].h);
+//       len = encodeNsend(jpg, raw, diffDims[i]);
+//       if (!len) continue;
+//       myBot.sendPhoto(msg, jpg, len);
+//       len = 0;
+//       free(jpg);
+//     }
+//     Serial.printf("Post encodeNsend\n");
+//   } else Serial.printf("Images are the same\n");
+//   //free(raw);
+// }
 
 void setFlash(TBMessage& msg) {
   Serial.println("Changing flash value");
@@ -249,8 +249,8 @@ void setup() {
   // Init the camera module (accordind the camera_config_t defined)
   init_camera();
 
-  raw = (uint8_t*)ps_malloc(3*PIX_LEN);
-  sub = (uint8_t*)ps_malloc(3*PIX_LEN/16);
+  //raw = (uint8_t*)ps_malloc(3*PIX_LEN);
+  //sub = (uint8_t*)ps_malloc(3*PIX_LEN/16);
   setLamp(flashval);
   camera_fb_t* fb = esp_camera_fb_get();
   Serial.printf("taken photo\n");
@@ -260,56 +260,108 @@ void setup() {
   fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
   esp_camera_fb_return(fb);
   Serial.printf("post jpg to rgb\n");
-  subsample(raw, sub);
-  store(sub, saved);
+  //subsample(raw, sub);
+  //store(sub, saved);
   Serial.printf("post store\n");
-  free(raw);
-  free(sub);
+  //free(raw);
+  //free(sub);
 }
 
 void loop() {
-  // A variable to store telegram message data
   TBMessage msg;
-  // if there is an incoming message...
-  if (myBot.getNewMessage(msg)) {
-    Serial.print("New message from chat_id: ");
-    Serial.println(msg.sender.id);
-    MessageType msgType = msg.messageType;
-    // Received a text message
-    if (msgType == MessageText) {
-      if (changingFlash) {
-        int8_t newval = atoi(msg.text.c_str());
-        if(newval >= 0 && newval <= 100) {
-          flashval = newval;
-          Serial.printf("Flash intensity set to %i\n", flashval);
-          String replyStr = "Flash intensity set to ";
-          replyStr += std::to_string(flashval).c_str();
-          myBot.sendMessage(msg, replyStr);      
-        } else {
-          myBot.sendMessage(msg, "Invalid flash value try values between 0 and 100");
-          Serial.printf("invalid flash value\n");
-        }
-        changingFlash = 0;
-      } else {
-        if (msg.text.equalsIgnoreCase("/takePhoto")) {
-          Serial.println("\nSending Photo from CAM");
-          //if (sendPicture(msg))
-          //    Serial.println("Picture sent successfull");
-          //else myBot.sendMessage(msg, "Error, picture not sent.");
-          taskCheck(NULL);
-        } else if (msg.text.equalsIgnoreCase("/changeFlash")) {
-          Serial.println("\nchanging flash intensity");
-          setFlash(msg);
-        } else {
-          Serial.print("\nText message received: ");
-          Serial.println(msg.text);
-          String replyStr = "Message received:\n";
-          replyStr += msg.text;
-          replyStr += "\nTry with /takePhoto to take a picture\n";
-          replyStr += "Try with /changeFlash to change the flash brightness";
-          myBot.sendMessage(msg, replyStr);
-        }
-      }     
+  Serial.printf("sending photo\n");
+
+  //raw = (uint8_t*)ps_malloc(3*PIX_LEN);
+  setLamp(flashval);
+  camera_fb_t* fb = esp_camera_fb_get();
+  Serial.printf("first get\n");  
+  esp_camera_fb_return(fb);
+  fb = esp_camera_fb_get();
+  Serial.printf("second get\n"); 
+  setLamp(0);
+  Serial.printf("pre conversion\n");
+  // fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+  Serial.printf("post conversion\n");
+  esp_camera_fb_return(fb);
+  Serial.printf("pre sub\n");
+  // subsample(raw,sub);
+  Serial.printf("post sub\n");
+  // different = compare(sub, saved, diffDims);
+  different = 0;
+  //diffDims[0].x = 2;
+  //diffDims[0].y = 2;
+  //diffDims[0].h = 2;
+  //diffDims[0].w = 2;
+  //uint8_t different = 1;
+  Serial.printf("post compare: different = %i\n", different);
+  //store(sub, saved);
+  //free(sub);
+  Serial.printf("%i\n", different);
+  if (different) {
+    Serial.printf("Images are different\n");
+    for (int i = 0; i < different; i++) {
+      Serial.printf("area #%i\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+      enlargeAdjust(&diffDims[i]);
+      Serial.printf("\t¦\n\tV\nx: %i, y: %i, w: %i, h:%i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+      jpg = (uint8_t*)ps_malloc(3*diffDims[i].w*diffDims[i].h);
+      // len = encodeNsend(jpg, raw, diffDims[i]);
+      if (!len) {
+        free(jpg);
+        continue;
+      }
+      myBot.sendPhoto(msg, jpg, len);
+      len = 0;
+      free(jpg);
     }
-  }
-}  
+    Serial.printf("Post encodeNsend\n");
+  } else Serial.printf("Images are the same\n");
+  //free(raw);
+  sleep(1);
+}
+
+// void loop() {
+//   // A variable to store telegram message data
+//   TBMessage msg;
+//   // if there is an incoming message...
+//   if (myBot.getNewMessage(msg)) {
+//     Serial.print("New message from chat_id: ");
+//     Serial.println(msg.sender.id);
+//     MessageType msgType = msg.messageType;
+//     // Received a text message
+//     if (msgType == MessageText) {
+//       if (changingFlash) {
+//         int8_t newval = atoi(msg.text.c_str());
+//         if(newval >= 0 && newval <= 100) {
+//           flashval = newval;
+//           Serial.printf("Flash intensity set to %i\n", flashval);
+//           String replyStr = "Flash intensity set to ";
+//           replyStr += std::to_string(flashval).c_str();
+//           myBot.sendMessage(msg, replyStr);      
+//         } else {
+//           myBot.sendMessage(msg, "Invalid flash value try values between 0 and 100");
+//           Serial.printf("invalid flash value\n");
+//         }
+//         changingFlash = 0;
+//       } else {
+//         if (msg.text.equalsIgnoreCase("/takePhoto")) {
+//           Serial.println("\nSending Photo from CAM");
+//           //if (sendPicture(msg))
+//           //    Serial.println("Picture sent successfull");
+//           //else myBot.sendMessage(msg, "Error, picture not sent.");
+//           taskCheck(NULL);
+//         } else if (msg.text.equalsIgnoreCase("/changeFlash")) {
+//           Serial.println("\nchanging flash intensity");
+//           setFlash(msg);
+//         } else {
+//           Serial.print("\nText message received: ");
+//           Serial.println(msg.text);
+//           String replyStr = "Message received:\n";
+//           replyStr += msg.text;
+//           replyStr += "\nTry with /takePhoto to take a picture\n";
+//           replyStr += "Try with /changeFlash to change the flash brightness";
+//           myBot.sendMessage(msg, replyStr);
+//         }
+//       }     
+//     }
+//   }
+// }  
