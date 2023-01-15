@@ -14,13 +14,15 @@ extern "C" {
 #include "encoder.h"
 }
 
-EXT_RAM_ATTR uint8_t raw[3*PIX_LEN];
+uint8_t EXT_RAM_ATTR raw[3*PIX_LEN];
 //EXT_RAM_ATTR uint8_t sub[3*PIX_LEN/16];
 uint8_t *jpg;
 //EXT_RAM_ATTR uint8_t saved[3*PIX_LEN/16];
-EXT_RAM_ATTR area_t diffDims[20];
+area_t EXT_RAM_ATTR diffDims[20];
 int len = 0;
 uint8_t different = 0;
+
+#include "credentials.h" // file containing wifif credentials and bot token
 
 const char* ssid = "Mi 11";  // SSID WiFi network
 const char* pass = "00000000";  // Password  WiFi network
