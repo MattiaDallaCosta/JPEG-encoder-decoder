@@ -24,10 +24,6 @@ uint8_t different = 0;
 
 #include "credentials.h" // file containing wifif credentials and bot token
 
-const char* ssid = "Mi 11";  // SSID WiFi network
-const char* pass = "00000000";  // Password  WiFi network
-const char* token = "5891807658:AAFgQDuxotPpZaP_a5bZ5FJj7XPrmKGByKo";
-
 // Check the userid with the help of bot @JsonDumpBot or @getidsbot (work also with groups)
 // https://t.me/JsonDumpBot  or  https://t.me/getidsbot
 int64_t userid = 1234567890;
