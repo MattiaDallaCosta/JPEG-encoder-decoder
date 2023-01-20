@@ -28,3 +28,6 @@
 #define PCLK_GPIO_NUM     22
 
 #define LED_GPIO_NUM      33
+#define LAMP_PIN           4
+
+
