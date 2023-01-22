@@ -2,6 +2,7 @@
 #include <driver/gpio.h>
 #include <esp_system.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <sys/param.h>
 // Include FreeRTOS for delay
 #include <freertos/FreeRTOS.h>
@@ -24,6 +25,7 @@ uint8_t *jpg;
 int16_t *ordered_dct_Y;
 int16_t *ordered_dct_Cb;
 int16_t *ordered_dct_Cr;
+
 uint8_t EXT_RAM_BSS_ATTR saved[3*PIX_LEN/16];
 area_t EXT_RAM_BSS_ATTR diffDims[20];
 huff_code EXT_RAM_BSS_ATTR Luma[2];
@@ -123,25 +125,25 @@ int app_main() {
     #ifdef CAM
     setLamp(0);
     #endif
-    ESP_LOGI(TAG, "pre conversion");
+    ESP_LOGI(TAG, "pre decoding");
     raw = (uint8_t*)heap_caps_malloc(3*PIX_LEN, MALLOC_CAP_SPIRAM);
     fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
-    ESP_LOGI(TAG, "post conversion");
+    ESP_LOGI(TAG, "post decoding");
     esp_camera_fb_return(fb);
     ESP_LOGI(TAG, "pre sub");
     sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
     subsample(raw,sub);
     ESP_LOGI(TAG, "post sub");
-    // different = compare(sub, saved, diffDims);
-    // ESP_LOGI(TAG, "post compare: different = %i", different);
+    different = compare_block(sub, saved, diffDims, 0);
+    ESP_LOGI(TAG, "post compare: different = %i", different);
     store(sub, saved);
     ESP_LOGI(TAG, "post save");
-    ESP_LOGI(TAG, "post malloc");
     area_t diff = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
     jpg = (uint8_t*)heap_caps_malloc(3*diff.h*diff.w, MALLOC_CAP_SPIRAM);
     ordered_dct_Y = (int16_t*)heap_caps_malloc(diff.h*diff.w, MALLOC_CAP_SPIRAM);
     ordered_dct_Cb = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
     ordered_dct_Cr = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
+    ESP_LOGI(TAG, "post malloc");
     int i, j;  
     uint8_t offx = 0, offy = 0;
     int last[3] = {0, 0, 0};
@@ -165,6 +167,7 @@ int app_main() {
     ESP_LOGI(TAG, "post huffman");
 	  size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diff, Luma, Chroma);
     ESP_LOGI(TAG, "post encode: size = %zu", size);
+    ESP_LOGW(TAG, "last characters: %i, %i", jpg[size - 2], jpg[size - 1]);
     // len = encodeNsend(jpg, raw, diff);
     free(ordered_dct_Y);
     free(ordered_dct_Cb);
