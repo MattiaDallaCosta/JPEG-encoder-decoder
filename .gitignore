@@ -11,3 +11,4 @@ comparator
 include/credentials.h
 gdbinit
 build
+.cached
