@@ -1,4 +1,4 @@
-/* * Data converted from /home/mattia/esp/blink/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from /home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 .section .rodata.embedded

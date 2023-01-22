@@ -169,7 +169,7 @@ void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[]) {
 }
 
 void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
-	int i,j;
+	int i;
 	for (i=0; i<PIX_LEN; i++) {
 		out[0][i] = in[0][(i/64)*64+scan_order[i%64]];
     if (i< PIX_LEN/4) {
@@ -179,12 +179,62 @@ void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
 	}
 }
 
+void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int off) {
+  int i = 0;
+  uint8_t app[2][32];
+  uint8_t offCbCr = ((off/WIDTH)/2)*(WIDTH/2) + (off%WIDTH)/2;
+  uint8_t midY[256];
+  uint8_t midCbCr[2][64];
+  int begin, j;
+  for (i = 0; i < 256; i++) {
+  int r = i%16;
+  int l = i/16;
+	midY[i]            =       0.299    * in[3*(i+off)] + 0.587    * in[3*(i+off)+1] + 0.114    * in[3*(i+off)+2];
+	app[0][(l%2)*16+r] = 128 - 0.168736 * in[3*(i+off)] - 0.331264 * in[3*(i+off)+1] + 0.5      * in[3*(i+off)+2];
+	app[1][(l%2)*16+r] = 128 + 0.5      * in[3*(i+off)] - 0.418688 * in[3*(i+off)+1] - 0.081312 * in[3*(i+off)+2];
+    if (r%2 == 1 && l%2 == 1) {
+			 midCbCr[0][(l/2*16)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][15+r] + app[0][16+r])/4;
+			 midCbCr[1][(l/2*16)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][15+r] + app[1][16+r])/4;
+    }
+    if (r%8 == 7 && l%8 == 7) {
+      begin = i - 119;
+      j = ((begin%16) + (begin/16)*2)/8;
+      int ih = j%2; 
+      int iv = j/2; 
+      dct_block(16, midY + (iv)*128 + ih*8, Y + (iv*2+ih)*64, luma_quantizer);
+    }
+    if (r == (15)) off += (WIDTH - 16);
+  }
+  dct_block(8, midCbCr[0], Cb + offCbCr, chroma_quantizer);
+  dct_block(8, midCbCr[1], Cr + offCbCr, chroma_quantizer);
+}
 void rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) {
+  int i, j;  
+  uint8_t offx = 0, offy = 0;
+  int last[3] = {0, 0, 0};
+  for (i = 0; i < (dims.w/16)*(dims.h/16); i++) {
+    rgb_to_dct_block(in, Y, Cb, Cr, (offy+dims.y)*WIDTH+(offx+dims.x));
+    for (j = 0; j < 4; j++) {
+    Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8] += last[0];
+    last[0] += Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8];
+    }
+    last[1] += Cb[(offy/2)*dims.w+offx/2]; 
+    Cb[(offy/2)*dims.w+offx/2] -= last[1]; 
+    Cr[(offy/2)*dims.w+dims.x/2] -= last[2]; 
+    last[2] += Cr[(offy/2)*dims.w+offx/2]; 
+    if(i%(dims.w/16) == (dims.w/16)-1) {
+      offx += 16;
+      offy = dims.y;
+    } else offy += 16;
+  }
+}
+
+void rgb_to_dct_full(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) {
   // printf("dims x: %i y: %i w: %i h: %i\n", dims.x, dims.y, dims.w, dims.h);
   int i = 0;
   int off = dims.y*WIDTH + dims.x;
   uint8_t app[2][2*dims.w];
-  uint8_t mid[3][16*dims.w];
+  uint8_t mid[3][dims.h*dims.w];
   // int dctapp[3][8*WIDTH];
   int last[3] = {0, 0, 0};
   int begin, j;
@@ -412,7 +462,7 @@ void calc_ac_freq(int num_pixel, int16_t dct_quant[], int freq[])
 	}
 }
 
-void init_huffman(int16_t Y[PIX_LEN], int16_t CbCr[2][PIX_LEN/4], area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
+void init_huffman(int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
 	int i;
 
 	huff_code* luma_dc =   &Luma[0];
@@ -429,10 +479,10 @@ void init_huffman(int16_t Y[PIX_LEN], int16_t CbCr[2][PIX_LEN/4], area_t dims, h
 	// calculate frequencies as basis for the huffman table construction
 	calc_dc_freq(dims.w*dims.h,   Y, luma_dc->sym_freq);
 	calc_ac_freq(dims.w*dims.h,   Y, luma_ac->sym_freq);
-	calc_dc_freq(dims.w*dims.h/4, CbCr[0], chroma_dc->sym_freq);
-	calc_dc_freq(dims.w*dims.h/4, CbCr[1], chroma_dc->sym_freq);
-	calc_ac_freq(dims.w*dims.h/4, CbCr[0], chroma_ac->sym_freq);
-	calc_ac_freq(dims.w*dims.h/4, CbCr[1], chroma_ac->sym_freq);
+	calc_dc_freq(dims.w*dims.h/4, Cb, chroma_dc->sym_freq);
+	calc_dc_freq(dims.w*dims.h/4, Cr, chroma_dc->sym_freq);
+	calc_ac_freq(dims.w*dims.h/4, Cb, chroma_ac->sym_freq);
+	calc_ac_freq(dims.w*dims.h/4, Cr, chroma_ac->sym_freq);
 
 	init_huff_table(luma_dc);
 	init_huff_table(luma_ac);
@@ -672,7 +722,7 @@ int mid[] = { 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 
 int coef_info[] = { 0xFF, 0x00, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00 };
 int eoi[] = { 0xFF, 0xD9 };
 
-size_t write_jpg(uint8_t* jpg, int16_t Y[PIX_LEN], int16_t CbCr[2][PIX_LEN/4], area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
+size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
   size_t size = 0;
   int i;
 
@@ -714,7 +764,7 @@ size_t write_jpg(uint8_t* jpg, int16_t Y[PIX_LEN], int16_t CbCr[2][PIX_LEN/4], a
   size += i;
   coef_info[5]++;
 
-  size += write_coefficients(jpg, dims.w*dims.h/4, CbCr[0], &Chroma[0], &Chroma[1], size);
+  size += write_coefficients(jpg, dims.w*dims.h/4, Cb, &Chroma[0], &Chroma[1], size);
   fill_last_byte(jpg, size); // da sistemare
 	size += 1;
 
@@ -723,7 +773,7 @@ size_t write_jpg(uint8_t* jpg, int16_t Y[PIX_LEN], int16_t CbCr[2][PIX_LEN/4], a
   coef_info[5] = 0x01;
   coef_info[6] = 0x00;
 
-  size += write_coefficients(jpg, dims.w*dims.h/4, CbCr[1], &Chroma[0], &Chroma[1], size);
+  size += write_coefficients(jpg, dims.w*dims.h/4, Cr, &Chroma[0], &Chroma[1], size);
   fill_last_byte(jpg, size); // da sistemare
 	size += 1;
 

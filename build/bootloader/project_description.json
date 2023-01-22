@@ -1,8 +1,8 @@
 {
     "project_name":       "bootloader",
     "project_path":       "/home/mattia/esp/esp-idf/components/bootloader/subproject",
-    "build_dir":          "/home/mattia/esp/blink/build/bootloader",
-    "config_file":        "/home/mattia/esp/blink/sdkconfig",
+    "build_dir":          "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader",
+    "config_file":        "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/sdkconfig",
     "config_defaults":    "",
     "bootloader_elf":     "",
     "app_elf":            "bootloader.elf",

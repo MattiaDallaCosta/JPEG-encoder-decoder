@@ -5,18 +5,18 @@ cmake_minimum_required(VERSION 3.5)
 
 file(MAKE_DIRECTORY
   "/home/mattia/esp/esp-idf/components/bootloader/subproject"
-  "/home/mattia/esp/blink/build/bootloader"
-  "/home/mattia/esp/blink/build/bootloader-prefix"
-  "/home/mattia/esp/blink/build/bootloader-prefix/tmp"
-  "/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp"
-  "/home/mattia/esp/blink/build/bootloader-prefix/src"
-  "/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp"
+  "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader"
+  "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix"
+  "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/tmp"
+  "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp"
+  "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src"
+  "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp"
 )
 
 set(configSubDirs )
 foreach(subDir IN LISTS configSubDirs)
-    file(MAKE_DIRECTORY "/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
+    file(MAKE_DIRECTORY "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
 endforeach()
 if(cfgdir)
-  file(MAKE_DIRECTORY "/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
+  file(MAKE_DIRECTORY "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
 endif()

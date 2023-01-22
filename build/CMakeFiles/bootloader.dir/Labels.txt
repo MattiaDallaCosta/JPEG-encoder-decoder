@@ -1,13 +1,13 @@
 # Target labels
  bootloader
 # Source files and their labels
-/home/mattia/esp/blink/build/CMakeFiles/bootloader
-/home/mattia/esp/blink/build/CMakeFiles/bootloader.rule
-/home/mattia/esp/blink/build/CMakeFiles/bootloader-complete.rule
-/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
-/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
-/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
-/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
-/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
-/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
-/home/mattia/esp/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/CMakeFiles/bootloader
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/CMakeFiles/bootloader.rule
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/CMakeFiles/bootloader-complete.rule
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule

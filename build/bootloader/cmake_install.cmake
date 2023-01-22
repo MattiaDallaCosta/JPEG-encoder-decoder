@@ -39,7 +39,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/mattia/esp/blink/build/bootloader/esp-idf/cmake_install.cmake")
+  include("/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader/esp-idf/cmake_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/mattia/esp/blink/build/bootloader/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/mattia/Desktop/Universita/3 year/2 semester/Thesis/build/bootloader/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

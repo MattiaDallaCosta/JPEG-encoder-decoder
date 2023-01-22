@@ -1,4 +1,4 @@
-# Install script for directory: /home/mattia/esp/blink/main
+# Install script for directory: /home/mattia/Desktop/Universita/3 year/2 semester/Thesis/main
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
