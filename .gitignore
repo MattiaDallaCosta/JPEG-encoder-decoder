@@ -10,3 +10,4 @@ images/savedImage.ppm
 comparator
 include/credentials.h
 gdbinit
+build
