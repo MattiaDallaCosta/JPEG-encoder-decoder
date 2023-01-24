@@ -176,10 +176,10 @@ void enlargeAdjust(area_t * a) {
   a->h *= 4;
   a->w = a->w - a->x + 1;
   a->h = a->h - a->y + 1;
+  a->x -= (16 - (a->w%16))/2;
+  a->y -= (16 - (a->h%16))/2;
   a->w = a->w%16 ? a->w + (16 - a->w%16) : a->w;
   a->h = a->h%16 ? a->h + (16 - a->h%16) : a->h;
-  a->x -= (a->w%16)/2;
-  a->y -= (a->h%16)/2;
   a->x -= a->x + a->w > WIDTH ? a->x + a->w - WIDTH : 0;
   a->y -= a->y + a->h > HEIGHT ? a->y + a->h - HEIGHT : 0;
   a->x = a->x < 0 ? 0 : a->x;
