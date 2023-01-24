@@ -716,10 +716,11 @@ size_t write_dht_header(uint8_t * jpg, int code_len_freq[], int sym_sorted[], in
 
 // 	fclose(f);
 // }
+
 int head[] = { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00 };
 int dqt_sym[] = { 0xFF, 0xDB, 0x00, 0x43, 0x00 };
 int mid[] = { 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01 };
-int coef_info[] = { 0xFF, 0x00, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00 };
+int coef_info[] = { 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00 };
 int eoi[] = { 0xFF, 0xD9 };
 
 size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
@@ -751,7 +752,7 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
   jpg[(size++)+i] = (dims.w)&0xFF;
   for (; i < 15; i++) jpg[size+i] = mid[i];
   size += i;
-	for (i = 0; i < 8; i++) jpg[size+i] = coef_info[i];
+	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];
   size += i;
   coef_info[5]++;
   coef_info[6] = 0x11;
@@ -760,7 +761,7 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
   fill_last_byte(jpg, size); // da sistemare
 	size += 1;
 
-	for (i = 0; i < 8; i++) jpg[size+i] = coef_info[i];
+	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];
   size += i;
   coef_info[5]++;
 
@@ -768,7 +769,7 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
   fill_last_byte(jpg, size); // da sistemare
 	size += 1;
 
-	for (i = 0; i < 8; i++) jpg[size+i] = coef_info[i];
+	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];
   size += i;
   coef_info[5] = 0x01;
   coef_info[6] = 0x00;

@@ -25,6 +25,6 @@ typedef struct {
 
 typedef struct {
   int beg, end, row, done;
-  int diff[2];
+  int diff[8];
 } pair_t;
 

@@ -4,9 +4,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/param.h>
+#include <sys/unistd.h>
+#include <sys/stat.h>
 // Include FreeRTOS for delay
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include "esp_spiffs.h"
 #include "esp_camera.h"
 #include "img_converters.h"
 
@@ -61,6 +64,13 @@ static camera_config_t camera_config = {
   .fb_location = CAMERA_FB_IN_PSRAM
 };
 
+esp_vfs_spiffs_conf_t conf = {
+  .base_path = "/spiffs",
+  .partition_label = NULL,
+  .max_files = 5,
+  .format_if_mount_failed = false
+};
+
 static esp_err_t init_camera() {
   //initialize the camera
   ESP_LOGI(TAG, "Camera init... ");
@@ -88,21 +98,34 @@ static esp_err_t init_camera() {
   }
   return ESP_OK;
 }
+
 int app_main() {
-  // Configure pin
-  gpio_config_t io_conf;
-  io_conf.intr_type = GPIO_INTR_DISABLE;
-  io_conf.mode = GPIO_MODE_OUTPUT;
-  io_conf.pin_bit_mask = (1ULL << LED);
-  io_conf.pull_down_en = 0;
-  io_conf.pull_up_en = 0;
-  gpio_config(&io_conf);
-  ESP_LOGI(TAG, "heap_caps_get_total_size(MALLOC_CAP_SPIRAM) = %zu", heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
+  int i;
+  for (i = 0; i < 20; i++) {
+    diffDims[i].x = -1;
+    diffDims[i].y = -1;
+    diffDims[i].w = -1;
+    diffDims[i].h = -1;
+  }
+  // Use settings defined above to initialize and mount SPIFFS filesystem.
+  // Note: esp_vfs_spiffs_register is an all-in-one convenience function.
+  esp_err_t ret = esp_vfs_spiffs_register(&conf);
+
+  if (ret != ESP_OK) {
+      if (ret == ESP_FAIL) {
+          ESP_LOGE(TAG, "Failed to mount or format filesystem");
+      } else if (ret == ESP_ERR_NOT_FOUND) {
+          ESP_LOGE(TAG, "Failed to find SPIFFS partition");
+      } else {
+          ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
+      }
+      return 1;
+  }
   init_camera();
-  // gpio_set_level(LED, 0);
   camera_fb_t* fb = esp_camera_fb_get();
+  esp_camera_fb_return(fb);
+  fb = esp_camera_fb_get();
   ESP_LOGI(TAG, "taken photo");
-  // gpio_set_level(LED, 1);
   ESP_LOGI(TAG, "image size: %zu, %zux%zu", fb->len, fb->width, fb->height);
   raw = (uint8_t*)heap_caps_malloc(3*PIX_LEN, MALLOC_CAP_SPIRAM);
   fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
@@ -111,20 +134,17 @@ int app_main() {
   sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
   subsample(raw, sub);
   store(sub, saved);
+  // store_file(sub, "/spiffs/saved");
   ESP_LOGI(TAG, "post store");
   free(raw);
   free(sub);
   ESP_LOGI(TAG, "--- finished initialization ---");
   // Main loop
   while(true) {
-    #ifdef CAM
-    setLamp(flashval);
-    #endif
-    camera_fb_t* fb = esp_camera_fb_get();
+    fb = esp_camera_fb_get();
+    esp_camera_fb_return(fb);
+    fb = esp_camera_fb_get();
     ESP_LOGI(TAG, "image capture"); 
-    #ifdef CAM
-    setLamp(0);
-    #endif
     ESP_LOGI(TAG, "pre decoding");
     raw = (uint8_t*)heap_caps_malloc(3*PIX_LEN, MALLOC_CAP_SPIRAM);
     fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
@@ -134,9 +154,22 @@ int app_main() {
     sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
     subsample(raw,sub);
     ESP_LOGI(TAG, "post sub");
-    different = compare_block(sub, saved, diffDims, 0);
+    uint8_t offx = 0, offy = 0;
+    // for (i = 0; i < PIX_LEN/16; i++) {
+    // // ESP_LOGI(TAG, "beginning loop %i", i);
+    //   different = compare_block(sub, saved, diffDims, different, offy*(WIDTH/4)+offx);
+    //   offx += 16;
+    //   if (i%(WIDTH/4)) {
+    //     offx = 0;
+    //     offy += 16;
+    //   }
+    // // ESP_LOGI(TAG, "done loop %i : different = %i", i, different);
+    // }
+    different = compare_block(sub, saved, diffDims, different, offy*(WIDTH/4)+offx);
     ESP_LOGI(TAG, "post compare: different = %i", different);
     store(sub, saved);
+    // store_file(sub, "/spiffs/saved");
+    free(sub);
     ESP_LOGI(TAG, "post save");
     area_t diff = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
     jpg = (uint8_t*)heap_caps_malloc(3*diff.h*diff.w, MALLOC_CAP_SPIRAM);
@@ -144,9 +177,10 @@ int app_main() {
     ordered_dct_Cb = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
     ordered_dct_Cr = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
     ESP_LOGI(TAG, "post malloc");
-    int i, j;  
-    uint8_t offx = 0, offy = 0;
+    int j;  
     int last[3] = {0, 0, 0};
+    offx = 0;
+    offy = 0;
     for (i = 0; i < (diff.w/16)*(diff.h/16); i++) {
       rgb_to_dct_block(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, (offy+diff.y)*WIDTH+(offx+diff.x));
       for (j = 0; j < 4; j++) {
@@ -174,7 +208,6 @@ int app_main() {
     free(ordered_dct_Cr);
     free(raw);
     free(jpg);
-    free(sub);
     ESP_LOGI(TAG, "post free");
     // if (different) {
     //   ESP_LOGI(TAG, "Images are different");
@@ -194,6 +227,6 @@ int app_main() {
     // } else ESP_LOGI(TAG, "Images are the same");
     // free(raw);
       vTaskDelay(1000 / portTICK_PERIOD_MS);
-  ESP_LOGI(TAG, "--- finished cicle ---");
+  ESP_LOGI(TAG, "--- finished cicle ---\n");
   }
 }
