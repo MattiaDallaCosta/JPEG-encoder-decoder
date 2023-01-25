@@ -37,7 +37,6 @@ void store(uint8_t in[3][PIX_LEN/16]) {
     saved[0][i] = in[0][i];
     saved[1][i] = in[1][i];
     saved[2][i] = in[2][i];
-    usleep(500);
   }
 }
 

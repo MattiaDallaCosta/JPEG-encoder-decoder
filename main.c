@@ -66,7 +66,6 @@ int main(int argc, char ** argv) {
         printf("\033[0;032mCreating saved file\033[0m\n");
         FILE * f_sub = fopen(savedName, "w");
         writePpm(f_sub, subsampled);
-        fclose(f_sub);
         gettimeofday(&store_t, NULL);
         millielapsed = (store_t.tv_usec - start.tv_usec)/1000;
         secelapsed = (store_t.tv_sec - start.tv_sec)/1000;
@@ -108,14 +107,15 @@ int main(int argc, char ** argv) {
         printf("storing time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
         for (int i = 0; i < different; i++) {
           gettimeofday(&appo, NULL);
-          // getName(text, newname, i);
-          sprintf(newname, "out-%i.jpg", i);
+          printf("pre getName\n");
+          getName(text, newname, i);
+          // sprintf(newname, "out-%i.jpg", i);
           enlargeAdjust(&diffDims[i]);
           encodeNsend(newname, raw, diffDims[i]);
           gettimeofday(&op_t, NULL);
           millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
           secelapsed = (op_t.tv_sec - appo.tv_sec);
-          printf("conversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+          printf("\033[1Aconversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
         }
       } else printf("\033[0;036mImages are the same\033[0m\n");
     } else {
