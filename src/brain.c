@@ -40,9 +40,9 @@ void subsample(uint8_t *in, uint8_t *out) {
 void store(uint8_t *in, uint8_t saved[3*PIX_LEN/16]) {
   int i = 0;
   for(; i < PIX_LEN/16; i++) {
-    saved[i]   = in[i];
-    saved[i+1] = in[i+1];
-    saved[i+2] = in[i+2];
+    saved[3*i]   = in[3*i];
+    saved[3*i+1] = in[3*i+1];
+    saved[3*i+2] = in[3*i+2];
   }
 }
 

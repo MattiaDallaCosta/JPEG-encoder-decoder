@@ -45,7 +45,7 @@ const int scan_order[] = {
 58, 59, 52, 45, 38, 31, 39, 46,
 53, 60, 61, 54, 47, 55, 62, 63};
 
-int readPpm(FILE* f, uint8_t raw[3][PIX_LEN]) {
+int readPpm(FILE* f, uint8_t * raw) {
 	if( fgetc(f) != 'P' || fgetc(f) != '6' )
 	{
 		fprintf(stderr, "Could not find magic number for this PPM!\n");
@@ -94,11 +94,10 @@ int readPpm(FILE* f, uint8_t raw[3][PIX_LEN]) {
 	int i;
 	for (i=0; i<PIX_LEN; i++)
 	{
-	  raw[0][i] = fgetc(f);
-	  raw[1][i] = fgetc(f);
-	  raw[2][i] = fgetc(f);
+	  raw[3*i+0] = fgetc(f);
+	  raw[3*i+1] = fgetc(f);
+	  raw[3*i+2] = fgetc(f);
 	}
-	
 	return 0;
 	
 X:	fprintf(stderr, "Could not parse the PPM file properly\n");
@@ -785,12 +784,12 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
 }
 
 int writePpm(FILE * f, uint8_t *sub) {
-  fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
-  printf("maxnum = %i\n\n", PIX_LEN);
-  for (int i = 0; i < (PIX_LEN); i++){
+  fprintf(f, "P6\n%i %i\n255\n", WIDTH/4, HEIGHT/4);
+  printf("maxnum = %i\n\n", PIX_LEN/16);
+  for (int i = 0; i < (PIX_LEN/16); i++){
     printf("\033[1A%i\n",i);
-    int w = i%(WIDTH);
-    int h = i/(WIDTH);
+    int w = i%(WIDTH/4);
+    int h = i/(WIDTH/4);
     putc(sub[3*((h/4)*WIDTH/4+w/4)+0], f);
     putc(sub[3*((h/4)*WIDTH/4+w/4)+1], f);
     putc(sub[3*((h/4)*WIDTH/4+w/4)+2], f);
