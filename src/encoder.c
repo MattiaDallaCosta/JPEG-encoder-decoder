@@ -45,87 +45,87 @@ const int scan_order[] = {
 58, 59, 52, 45, 38, 31, 39, 46,
 53, 60, 61, 54, 47, 55, 62, 63};
 
-// int readPpm(FILE* f, uint8_t raw[3][PIX_LEN]) {
-// 	if( fgetc(f) != 'P' || fgetc(f) != '6' )
-// 	{
-// 		fprintf(stderr, "Could not find magic number for this PPM!\n");
-// 		return -1;
-// 	}
+int readPpm(FILE* f, uint8_t raw[3][PIX_LEN]) {
+	if( fgetc(f) != 'P' || fgetc(f) != '6' )
+	{
+		fprintf(stderr, "Could not find magic number for this PPM!\n");
+		return -1;
+	}
 
-// 	if (fgetc(f) != '\n' )
-// 		goto X;
+	if (fgetc(f) != '\n' )
+		goto X;
 
-// 	char buf[1024];
-// 	while(1)
-// 	{
-// 		char* p = buf;
-// 		while ((*p = fgetc(f)) != '\n')
-// 			p++;
-// 		*p = '\0';
+	char buf[1024];
+	while(1)
+	{
+		char* p = buf;
+		while ((*p = fgetc(f)) != '\n')
+			p++;
+		*p = '\0';
 
-// 		if (buf[0] != '#')
-// 			break;
-// 	}
-// 	int width, height;
-// 	if (sscanf(buf, "%d %d\n", &width, &height) != 2)
-// 		goto X;
-// 	if (width != WIDTH || height != HEIGHT) {
-// 		fprintf(stderr, "Only pictures with dimensions pre-defined\n");
-// 		return -1;
-// 	}
+		if (buf[0] != '#')
+			break;
+	}
+	int width, height;
+	if (sscanf(buf, "%d %d\n", &width, &height) != 2)
+		goto X;
+	if (width != WIDTH || height != HEIGHT) {
+		fprintf(stderr, "Only pictures with dimensions pre-defined\n");
+		return -1;
+	}
 
-// 	int depth;
-// 	if (fscanf(f, "%d\n", &depth) != 1)
-// 		goto X;
+	int depth;
+	if (fscanf(f, "%d\n", &depth) != 1)
+		goto X;
 
-// 	if (depth != 255)
-// 	{
-// 		printf("For simplicity, only a bit-depth of 256 is supported!\n");
-// 		return -1;
-// 	}
+	if (depth != 255)
+	{
+		printf("For simplicity, only a bit-depth of 256 is supported!\n");
+		return -1;
+	}
 
-// 	long len = ftell(f);
-// 	fseek(f, 0L, SEEK_END);
-// 	len = ftell(f) - len;
-// 	fseek(f, -len, SEEK_END);
-// 	if (len != 3*PIX_LEN) // 3 color channels
-// 		goto X;
+	long len = ftell(f);
+	fseek(f, 0L, SEEK_END);
+	len = ftell(f) - len;
+	fseek(f, -len, SEEK_END);
+	if (len != 3*PIX_LEN) // 3 color channels
+		goto X;
 
-// 	int i;
-// 	for (i=0; i<PIX_LEN; i++)
-// 	{
-// 	  raw[0][i] = fgetc(f);
-// 	  raw[1][i] = fgetc(f);
-// 	  raw[2][i] = fgetc(f);
-// 	}
-// 	
-// 	return 0;
-// 	
-// X:	fprintf(stderr, "Could not parse the PPM file properly\n");
-// 	return -1;
-// }
+	int i;
+	for (i=0; i<PIX_LEN; i++)
+	{
+	  raw[0][i] = fgetc(f);
+	  raw[1][i] = fgetc(f);
+	  raw[2][i] = fgetc(f);
+	}
+	
+	return 0;
+	
+X:	fprintf(stderr, "Could not parse the PPM file properly\n");
+	return -1;
+}
 
 
 double_t getDouble(const int64_t *bitval) {                                              // convert the double_t value, saved as int64_t in order
     return *((double_t*)(bitval));                                                       // to maintain the preciseness, into an actual double_t
 }
 
-// void getName(char *name, char *buff, int num) {
-//   char *pos;
-//   strcpy(buff, name);
-//   pos = strrchr(buff, '.') ? (strrchr(buff, '.') < strrchr(buff, '/') ? buff + strlen(buff) : strrchr(buff, '.')) : buff + strlen(buff);
-//   char *end;
-//   if(num < 0) strcpy(end, ".jpg");
-//   else sprintf(end, "-%i.jpg", num);
-//   strcpy(pos, end);
-// }
+void getName(char *name, char *buff, int num) {
+  char *pos;
+  strcpy(buff, name);
+  pos = strrchr(buff, '.') ? (strrchr(buff, '.') < strrchr(buff, '/') ? buff + strlen(buff) : strrchr(buff, '.')) : buff + strlen(buff);
+  char *end;
+  if(num < 0) strcpy(end, ".jpg");
+  else sprintf(end, "-%i.jpg", num);
+  strcpy(pos, end);
+}
 
-// void getSavedName(char *name, char *buff) {
-//   char *pos;
-//   strcpy(buff, name);
-//   pos =  strrchr(buff, '/') ? strrchr(buff, '/') : buff;
-//   strcpy(*pos == '/' ? pos+1 : pos,  "savedImage.ppm");
-// }
+void getSavedName(char *name, char *buff) {
+  char *pos;
+  strcpy(buff, name);
+  pos =  strrchr(buff, '/') ? strrchr(buff, '/') : buff;
+  strcpy(*pos == '/' ? pos+1 : pos,  "savedImage.ppm");
+}
 
 void zigzag_block(int16_t in[64], int16_t out[64]) {
 	int i = 0;
@@ -784,20 +784,20 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
   return size;
 }
 
-// int writePpm(FILE * f, uint8_t sub[3][PIX_LEN/16]) {
-//   fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
-//   printf("maxnum = %i\n\n", PIX_LEN);
-//   for (int i = 0; i < (PIX_LEN); i++){
-//     printf("\033[1A%i\n",i);
-//     int w = i%(WIDTH);
-//     int h = i/(WIDTH);
-//     putc(sub[0][(h/4)*WIDTH/4+w/4], f);
-//     putc(sub[1][(h/4)*WIDTH/4+w/4], f);
-//     putc(sub[2][(h/4)*WIDTH/4+w/4], f);
-//   }
-//   fclose(f);
-//   return 0;
-// }
+int writePpm(FILE * f, uint8_t *sub) {
+  fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
+  printf("maxnum = %i\n\n", PIX_LEN);
+  for (int i = 0; i < (PIX_LEN); i++){
+    printf("\033[1A%i\n",i);
+    int w = i%(WIDTH);
+    int h = i/(WIDTH);
+    putc(sub[3*((h/4)*WIDTH/4+w/4)+0], f);
+    putc(sub[3*((h/4)*WIDTH/4+w/4)+1], f);
+    putc(sub[3*((h/4)*WIDTH/4+w/4)+2], f);
+  }
+  fclose(f);
+  return 0;
+}
 
 // int writeDiffPpm(char * filename, uint8_t sub[3][PIX_LEN], area_t * dims) {
 //   FILE * f = fopen(filename, "w");

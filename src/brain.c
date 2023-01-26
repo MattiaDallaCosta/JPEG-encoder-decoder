@@ -4,7 +4,6 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
-#include <esp_log.h>
 
 void subsample(uint8_t *in, uint8_t *out) {
   int i = 0;
