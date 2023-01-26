@@ -45,65 +45,65 @@ const int scan_order[] = {
 58, 59, 52, 45, 38, 31, 39, 46,
 53, 60, 61, 54, 47, 55, 62, 63};
 
-int readPpm(FILE* f, uint8_t raw[3][PIX_LEN]) {
-	if( fgetc(f) != 'P' || fgetc(f) != '6' )
-	{
-		fprintf(stderr, "Could not find magic number for this PPM!\n");
-		return -1;
-	}
+// int readPpm(FILE* f, uint8_t raw[3][PIX_LEN]) {
+// 	if( fgetc(f) != 'P' || fgetc(f) != '6' )
+// 	{
+// 		fprintf(stderr, "Could not find magic number for this PPM!\n");
+// 		return -1;
+// 	}
 
-	if (fgetc(f) != '\n' )
-		goto X;
+// 	if (fgetc(f) != '\n' )
+// 		goto X;
 
-	char buf[1024];
-	while(1)
-	{
-		char* p = buf;
-		while ((*p = fgetc(f)) != '\n')
-			p++;
-		*p = '\0';
+// 	char buf[1024];
+// 	while(1)
+// 	{
+// 		char* p = buf;
+// 		while ((*p = fgetc(f)) != '\n')
+// 			p++;
+// 		*p = '\0';
 
-		if (buf[0] != '#')
-			break;
-	}
-	int width, height;
-	if (sscanf(buf, "%d %d\n", &width, &height) != 2)
-		goto X;
-	if (width != WIDTH || height != HEIGHT) {
-		fprintf(stderr, "Only pictures with dimensions pre-defined\n");
-		return -1;
-	}
+// 		if (buf[0] != '#')
+// 			break;
+// 	}
+// 	int width, height;
+// 	if (sscanf(buf, "%d %d\n", &width, &height) != 2)
+// 		goto X;
+// 	if (width != WIDTH || height != HEIGHT) {
+// 		fprintf(stderr, "Only pictures with dimensions pre-defined\n");
+// 		return -1;
+// 	}
 
-	int depth;
-	if (fscanf(f, "%d\n", &depth) != 1)
-		goto X;
+// 	int depth;
+// 	if (fscanf(f, "%d\n", &depth) != 1)
+// 		goto X;
 
-	if (depth != 255)
-	{
-		printf("For simplicity, only a bit-depth of 256 is supported!\n");
-		return -1;
-	}
+// 	if (depth != 255)
+// 	{
+// 		printf("For simplicity, only a bit-depth of 256 is supported!\n");
+// 		return -1;
+// 	}
 
-	long len = ftell(f);
-	fseek(f, 0L, SEEK_END);
-	len = ftell(f) - len;
-	fseek(f, -len, SEEK_END);
-	if (len != 3*PIX_LEN) // 3 color channels
-		goto X;
+// 	long len = ftell(f);
+// 	fseek(f, 0L, SEEK_END);
+// 	len = ftell(f) - len;
+// 	fseek(f, -len, SEEK_END);
+// 	if (len != 3*PIX_LEN) // 3 color channels
+// 		goto X;
 
-	int i;
-	for (i=0; i<PIX_LEN; i++)
-	{
-	  raw[0][i] = fgetc(f);
-	  raw[1][i] = fgetc(f);
-	  raw[2][i] = fgetc(f);
-	}
-	
-	return 0;
-	
-X:	fprintf(stderr, "Could not parse the PPM file properly\n");
-	return -1;
-}
+// 	int i;
+// 	for (i=0; i<PIX_LEN; i++)
+// 	{
+// 	  raw[0][i] = fgetc(f);
+// 	  raw[1][i] = fgetc(f);
+// 	  raw[2][i] = fgetc(f);
+// 	}
+// 	
+// 	return 0;
+// 	
+// X:	fprintf(stderr, "Could not parse the PPM file properly\n");
+// 	return -1;
+// }
 
 
 double_t getDouble(const int64_t *bitval) {                                              // convert the double_t value, saved as int64_t in order
@@ -168,16 +168,16 @@ void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[]) {
   zigzag_block(dct, out);
 }
 
-void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
-	int i;
-	for (i=0; i<PIX_LEN; i++) {
-		out[0][i] = in[0][(i/64)*64+scan_order[i%64]];
-    if (i< PIX_LEN/4) {
-		   out[1][i] = in[1][(i/64)*64+scan_order[i%64]];
-		   out[2][i] = in[2][(i/64)*64+scan_order[i%64]];
-    }
-	}
-}
+// void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
+// 	int i;
+// 	for (i=0; i<PIX_LEN; i++) {
+// 		out[0][i] = in[0][(i/64)*64+scan_order[i%64]];
+//     if (i< PIX_LEN/4) {
+// 		   out[1][i] = in[1][(i/64)*64+scan_order[i%64]];
+// 		   out[2][i] = in[2][(i/64)*64+scan_order[i%64]];
+//     }
+// 	}
+// }
 
 void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int off) {
   int i = 0;
@@ -229,57 +229,57 @@ void rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) 
   }
 }
 
-void rgb_to_dct_full(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) {
-  // printf("dims x: %i y: %i w: %i h: %i\n", dims.x, dims.y, dims.w, dims.h);
-  int i = 0;
-  int off = dims.y*WIDTH + dims.x;
-  uint8_t app[2][2*dims.w];
-  uint8_t mid[3][dims.h*dims.w];
-  // int dctapp[3][8*WIDTH];
-  int last[3] = {0, 0, 0};
-  int begin, j;
-	for (; i < dims.w*dims.h; i++) {
-    int r = i%dims.w;
-    int l = i/dims.w;
-		// mid[0][(l%8)*WIDTH+r]                =       0.299    * in[0][i] + 0.587    * in[1][i] + 0.114    * in[2][i];
-		mid[0][i]              =       0.299    * in[3*(i+off)] + 0.587    * in[3*(i+off)+1] + 0.114    * in[3*(i+off)+2];
-		app[0][(l%2)*dims.w+r] = 128 - 0.168736 * in[3*(i+off)] - 0.331264 * in[3*(i+off)+1] + 0.5      * in[3*(i+off)+2];
-		app[1][(l%2)*dims.w+r] = 128 + 0.5      * in[3*(i+off)] - 0.418688 * in[3*(i+off)+1] - 0.081312 * in[3*(i+off)+2];
-    if (r%2 == 1 && l%2 == 1) {
-			 mid[1][(l/2*dims.w)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][dims.w+r-1] + app[0][dims.w+r])/4;
-			 mid[2][(l/2*dims.w)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][dims.w+r-1] + app[1][dims.w+r])/4;
-    }
-    if (r%8 == 7 && l%8 == 7) {
-      begin = i - 7*(dims.w+1);
-      j = ((begin%dims.w) + (begin/dims.w)*(dims.w/8))/8;
-      int ih = j%(dims.w/8); 
-      int iv = j/(dims.w/8); 
-      // dct_block(WIDTH, mid[0] + ih*8, out[0] + (iv*(WIDTH/8)+ih)*64, luma_quantizer);
-      dct_block(dims.w, mid[0] + (iv)*dims.w*8 + ih*8, Y + (iv*(dims.w/8)+ih)*64, luma_quantizer);
-      Y[(iv*(dims.w/8)+ih)*64] -= last[0];
-      last[0] += Y[(iv*(dims.w/8)+ih)*64];
-      if (ih%2 == 1 && iv%2 == 1) {
-        begin = begin - 8*(dims.w+1);
-        j = ((begin%(dims.w)) + (begin/(dims.w))*(dims.w/8))/8;
-        ih = j%(dims.w/8); 
-        iv = j/(dims.w/8); 
-        // dct_block(WIDTH/2, mid[1] + (ih)*4, out[1] + (iv*WIDTH/16+ih)*32, chroma_quantizer);
-        // dct_block(WIDTH/2, mid[2] + (ih)*4, out[2] + (iv*WIDTH/16+ih)*32, chroma_quantizer);
-        dct_block(dims.w/2, mid[1] + (iv*dims.w + ih*2)*2, Cb + (iv*dims.w/16+ih)*32, chroma_quantizer);
-        dct_block(dims.w/2, mid[2] + (iv*dims.w + ih*2)*2, Cr + (iv*dims.w/16+ih)*32, chroma_quantizer);
-        Cb[(iv*dims.w/16+ih)*32] -= last[1];
-        last[1] += Cb[(iv*dims.w/16+ih)*32];
-        Cr[(iv*dims.w/16+ih)*32] -= last[2];
-        last[2] += Cr[(iv*dims.w/16+ih)*32];
-      }
-    }
-    if (r == (dims.w - 1)){
-      printf("off : %i\n", off);
-      off += (WIDTH - dims.w);
-      printf("off : %i\n", off);
-    }
-	}
-}
+// void rgb_to_dct_full(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) {
+//   // printf("dims x: %i y: %i w: %i h: %i\n", dims.x, dims.y, dims.w, dims.h);
+//   int i = 0;
+//   int off = dims.y*WIDTH + dims.x;
+//   uint8_t app[2][2*dims.w];
+//   uint8_t mid[3][dims.h*dims.w];
+//   // int dctapp[3][8*WIDTH];
+//   int last[3] = {0, 0, 0};
+//   int begin, j;
+// 	for (; i < dims.w*dims.h; i++) {
+//     int r = i%dims.w;
+//     int l = i/dims.w;
+// 		// mid[0][(l%8)*WIDTH+r]                =       0.299    * in[0][i] + 0.587    * in[1][i] + 0.114    * in[2][i];
+// 		mid[0][i]              =       0.299    * in[3*(i+off)] + 0.587    * in[3*(i+off)+1] + 0.114    * in[3*(i+off)+2];
+// 		app[0][(l%2)*dims.w+r] = 128 - 0.168736 * in[3*(i+off)] - 0.331264 * in[3*(i+off)+1] + 0.5      * in[3*(i+off)+2];
+// 		app[1][(l%2)*dims.w+r] = 128 + 0.5      * in[3*(i+off)] - 0.418688 * in[3*(i+off)+1] - 0.081312 * in[3*(i+off)+2];
+//     if (r%2 == 1 && l%2 == 1) {
+// 			 mid[1][(l/2*dims.w)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][dims.w+r-1] + app[0][dims.w+r])/4;
+// 			 mid[2][(l/2*dims.w)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][dims.w+r-1] + app[1][dims.w+r])/4;
+//     }
+//     if (r%8 == 7 && l%8 == 7) {
+//       begin = i - 7*(dims.w+1);
+//       j = ((begin%dims.w) + (begin/dims.w)*(dims.w/8))/8;
+//       int ih = j%(dims.w/8); 
+//       int iv = j/(dims.w/8); 
+//       // dct_block(WIDTH, mid[0] + ih*8, out[0] + (iv*(WIDTH/8)+ih)*64, luma_quantizer);
+//       dct_block(dims.w, mid[0] + (iv)*dims.w*8 + ih*8, Y + (iv*(dims.w/8)+ih)*64, luma_quantizer);
+//       Y[(iv*(dims.w/8)+ih)*64] -= last[0];
+//       last[0] += Y[(iv*(dims.w/8)+ih)*64];
+//       if (ih%2 == 1 && iv%2 == 1) {
+//         begin = begin - 8*(dims.w+1);
+//         j = ((begin%(dims.w)) + (begin/(dims.w))*(dims.w/8))/8;
+//         ih = j%(dims.w/8); 
+//         iv = j/(dims.w/8); 
+//         // dct_block(WIDTH/2, mid[1] + (ih)*4, out[1] + (iv*WIDTH/16+ih)*32, chroma_quantizer);
+//         // dct_block(WIDTH/2, mid[2] + (ih)*4, out[2] + (iv*WIDTH/16+ih)*32, chroma_quantizer);
+//         dct_block(dims.w/2, mid[1] + (iv*dims.w + ih*2)*2, Cb + (iv*dims.w/16+ih)*32, chroma_quantizer);
+//         dct_block(dims.w/2, mid[2] + (iv*dims.w + ih*2)*2, Cr + (iv*dims.w/16+ih)*32, chroma_quantizer);
+//         Cb[(iv*dims.w/16+ih)*32] -= last[1];
+//         last[1] += Cb[(iv*dims.w/16+ih)*32];
+//         Cr[(iv*dims.w/16+ih)*32] -= last[2];
+//         last[2] += Cr[(iv*dims.w/16+ih)*32];
+//       }
+//     }
+//     if (r == (dims.w - 1)){
+//       printf("off : %i\n", off);
+//       off += (WIDTH - dims.w);
+//       printf("off : %i\n", off);
+//     }
+// 	}
+// }
 
 void init_huff_table(huff_code* hc)
 {

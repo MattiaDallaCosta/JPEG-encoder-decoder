@@ -9,7 +9,6 @@
 // Include FreeRTOS for delay
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include "esp_spiffs.h"
 #include "esp_camera.h"
 #include "img_converters.h"
 
@@ -28,9 +27,11 @@ uint8_t *jpg;
 int16_t *ordered_dct_Y;
 int16_t *ordered_dct_Cb;
 int16_t *ordered_dct_Cr;
+// area_t * diffDims;
 
 uint8_t EXT_RAM_BSS_ATTR saved[3*PIX_LEN/16];
 area_t EXT_RAM_BSS_ATTR diffDims[20];
+pair_t EXT_RAM_BSS_ATTR differences[100];
 huff_code EXT_RAM_BSS_ATTR Luma[2];
 huff_code EXT_RAM_BSS_ATTR Chroma[2];
 int len = 0;
@@ -64,13 +65,6 @@ static camera_config_t camera_config = {
   .fb_location = CAMERA_FB_IN_PSRAM
 };
 
-esp_vfs_spiffs_conf_t conf = {
-  .base_path = "/spiffs",
-  .partition_label = NULL,
-  .max_files = 5,
-  .format_if_mount_failed = false
-};
-
 static esp_err_t init_camera() {
   //initialize the camera
   ESP_LOGI(TAG, "Camera init... ");
@@ -101,26 +95,6 @@ static esp_err_t init_camera() {
 
 int app_main() {
   int i;
-  for (i = 0; i < 20; i++) {
-    diffDims[i].x = -1;
-    diffDims[i].y = -1;
-    diffDims[i].w = -1;
-    diffDims[i].h = -1;
-  }
-  // Use settings defined above to initialize and mount SPIFFS filesystem.
-  // Note: esp_vfs_spiffs_register is an all-in-one convenience function.
-  esp_err_t ret = esp_vfs_spiffs_register(&conf);
-
-  if (ret != ESP_OK) {
-      if (ret == ESP_FAIL) {
-          ESP_LOGE(TAG, "Failed to mount or format filesystem");
-      } else if (ret == ESP_ERR_NOT_FOUND) {
-          ESP_LOGE(TAG, "Failed to find SPIFFS partition");
-      } else {
-          ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
-      }
-      return 1;
-  }
   init_camera();
   camera_fb_t* fb = esp_camera_fb_get();
   esp_camera_fb_return(fb);
@@ -134,13 +108,19 @@ int app_main() {
   sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
   subsample(raw, sub);
   store(sub, saved);
-  // store_file(sub, "/spiffs/saved");
   ESP_LOGI(TAG, "post store");
   free(raw);
   free(sub);
   ESP_LOGI(TAG, "--- finished initialization ---");
   // Main loop
   while(true) {
+    for (i = 0; i < 20; i++) {
+      diffDims[i].x = -1;
+      diffDims[i].y = -1;
+      diffDims[i].w = -1;
+      diffDims[i].h = -1;
+    }
+    different = 0;
     fb = esp_camera_fb_get();
     esp_camera_fb_return(fb);
     fb = esp_camera_fb_get();
@@ -155,20 +135,23 @@ int app_main() {
     subsample(raw,sub);
     ESP_LOGI(TAG, "post sub");
     uint8_t offx = 0, offy = 0;
-    // for (i = 0; i < PIX_LEN/16; i++) {
-    // // ESP_LOGI(TAG, "beginning loop %i", i);
-    //   different = compare_block(sub, saved, diffDims, different, offy*(WIDTH/4)+offx);
-    //   offx += 16;
-    //   if (i%(WIDTH/4)) {
-    //     offx = 0;
-    //     offy += 16;
-    //   }
-    // // ESP_LOGI(TAG, "done loop %i : different = %i", i, different);
-    // }
-    different = compare_block(sub, saved, diffDims, different, offy*(WIDTH/4)+offx);
+    for (i = 0; i < PIX_LEN/256; i++) {
+    // ESP_LOGI(TAG, "offx = %i, offy = %i", offx, offy);
+      different = compare_block(sub, saved, diffDims, differences, different, offy*(WIDTH/4)+offx);
+      if (!(i%(WIDTH/16)) && i) {
+        offx = 0;
+        offy += 4;
+
+      } else offx += 4;
+    // ESP_LOGI(TAG, "done loop %i : different = %i", i, different);
+    if(different > 19) break;
+    }
     ESP_LOGI(TAG, "post compare: different = %i", different);
+    for (int i = 0; i < different; i++) {
+      enlargeAdjust(diffDims+i);
+      ESP_LOGI(TAG, "diffDims[%i]: .x = %i, .y = %i, .w = %i, .h = %i", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+    }
     store(sub, saved);
-    // store_file(sub, "/spiffs/saved");
     free(sub);
     ESP_LOGI(TAG, "post save");
     area_t diff = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
@@ -206,8 +189,8 @@ int app_main() {
     free(ordered_dct_Y);
     free(ordered_dct_Cb);
     free(ordered_dct_Cr);
+   //  free(jpg);
     free(raw);
-    free(jpg);
     ESP_LOGI(TAG, "post free");
     // if (different) {
     //   ESP_LOGI(TAG, "Images are different");
