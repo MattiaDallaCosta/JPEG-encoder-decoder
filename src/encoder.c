@@ -418,8 +418,7 @@ int huff_class(int value)
 void calc_dc_freq(int num_pixel, int16_t dct_quant[], int freq[])
 {
 	int i;
-	for (i=0; i<num_pixel; i+=64)
-		freq[huff_class(dct_quant[i])]++;
+	for (i=0; i<num_pixel; i+=64) freq[huff_class(dct_quant[i])]++;
 }
 
 void calc_ac_freq(int num_pixel, int16_t dct_quant[], int freq[])
@@ -464,10 +463,11 @@ void calc_ac_freq(int num_pixel, int16_t dct_quant[], int freq[])
 void init_huffman(int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
 	int i;
 
-	huff_code* luma_dc =   &Luma[0];
-	huff_code* luma_ac =   &Luma[1];
-	huff_code* chroma_dc = &Chroma[0];
-	huff_code* chroma_ac = &Chroma[1];
+
+	huff_code* luma_dc =   Luma;
+	huff_code* luma_ac =   Luma+1;
+	huff_code* chroma_dc = Chroma;
+	huff_code* chroma_ac = Chroma+1;
 
 	// initialize
 	for (i=0; i<256; i++)
@@ -479,8 +479,8 @@ void init_huffman(int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_cod
 	calc_dc_freq(dims.w*dims.h,   Y, luma_dc->sym_freq);
 	calc_ac_freq(dims.w*dims.h,   Y, luma_ac->sym_freq);
 	calc_dc_freq(dims.w*dims.h/4, Cb, chroma_dc->sym_freq);
-	calc_dc_freq(dims.w*dims.h/4, Cr, chroma_dc->sym_freq);
 	calc_ac_freq(dims.w*dims.h/4, Cb, chroma_ac->sym_freq);
+	calc_dc_freq(dims.w*dims.h/4, Cr, chroma_dc->sym_freq);
 	calc_ac_freq(dims.w*dims.h/4, Cr, chroma_ac->sym_freq);
 
 	init_huff_table(luma_dc);
@@ -757,7 +757,7 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
   coef_info[6] = 0x11;
 
 	size += write_coefficients(jpg, dims.w*dims.h, Y, &Luma[0], &Luma[1], size); // da sistemare
-  fill_last_byte(jpg, size); // da sistemare
+  fill_last_byte(jpg, size); // da sistemare             
 	size += 1;
 
 	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];
@@ -765,14 +765,14 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
   coef_info[5]++;
 
   size += write_coefficients(jpg, dims.w*dims.h/4, Cb, &Chroma[0], &Chroma[1], size);
-  fill_last_byte(jpg, size); // da sistemare
-	size += 1;
-
-	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];
-  size += i;
-  coef_info[5] = 0x01;
-  coef_info[6] = 0x00;
-
+  fill_last_byte(jpg, size); // da sistemare                       
+	size += 1;                                                       
+                                                                   
+	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];             
+  size += i;                                                       
+  coef_info[5] = 0x01;                                             
+  coef_info[6] = 0x00;                                             
+                                                                   
   size += write_coefficients(jpg, dims.w*dims.h/4, Cr, &Chroma[0], &Chroma[1], size);
   fill_last_byte(jpg, size); // da sistemare
 	size += 1;

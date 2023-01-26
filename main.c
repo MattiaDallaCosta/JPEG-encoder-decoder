@@ -113,6 +113,7 @@ int main(int argc, char ** argv) {
     secelapsed = (sub_t.tv_sec - read_t.tv_sec)/1000;
     printf("subsampling time:                     %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
     if(stored){
+      different = 0;
       for (i = 0; i < 20; i++) {
         diffDims[i].x = -1;
         diffDims[i].y = -1;
@@ -120,7 +121,7 @@ int main(int argc, char ** argv) {
         diffDims[i].h = -1;
       }
       for (i = 0; i < PIX_LEN/256; i++) {
-      // ESP_LOGI(TAG, "offx = %i, offy = %i", offx, offy);
+        printf("loop %i\n", i);
         different = compare_block(sub, saved, diffDims, differences, different, offy*(WIDTH/4)+offx);
         if (!(i%(WIDTH/16)) && i) {
           offx = 0;
@@ -128,13 +129,14 @@ int main(int argc, char ** argv) {
         } else offx += 4;
       }
       printf("different = %i\n", different);
+      store(sub, saved);
+      free(sub);
       gettimeofday(&comp_t, NULL);
       millielapsed = (comp_t.tv_usec - sub_t.tv_usec)/1000;
       secelapsed = (comp_t.tv_sec - sub_t.tv_sec);
       printf("comparison time:                      %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
     //   if (different) {
     //     printf("\033[0;036mImages are different\033[0m\n");
-    //     store(sub, saved);
     //     gettimeofday(&store_t, NULL);
     //     millielapsed = (store_t.tv_usec - comp_t.tv_usec)/1000;
     //     secelapsed = (store_t.tv_sec - comp_t.tv_sec);
@@ -183,6 +185,10 @@ int main(int argc, char ** argv) {
     //       millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
     //       secelapsed = (op_t.tv_sec - appo.tv_sec);
     //       printf("\033[1Aconversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+    //       free(ordered_dct_Y);
+    //       free(ordered_dct_Cb);
+    //       free(ordered_dct_Cr);
+    //       free(raw);
     //     }
     //   } else printf("\033[0;036mImages are the same\033[0m\n");
     } else {
@@ -214,39 +220,37 @@ int main(int argc, char ** argv) {
         ordered_dct_Y[((offy+(j%2))*fullImage.w)*8 + (offx+(j/2))*8] += last[0];
         last[0] += ordered_dct_Y[((offy+(j%2))*fullImage.w)*8 + (offx+(j/2))*8];
         }
-        ordered_dct_Cb[(offy/2)*fullImage.w+offx/2] -= last[1]; 
-        last[1] += ordered_dct_Cb[(offy/2)*fullImage.w+offx/2]; 
-        ordered_dct_Cr[(offy/2)*fullImage.w+offx/2] -= last[2]; 
-        last[2] += ordered_dct_Cr[(offy/2)*fullImage.w+offx/2]; 
+        ordered_dct_Cb[(offy/2)*fullImage.w/2+offx/2] -= last[1]; 
+        last[1] += ordered_dct_Cb[(offy/2)*fullImage.w/2+offx/2]; 
+        ordered_dct_Cr[(offy/2)*fullImage.w/2+offx/2] -= last[2]; 
+        last[2] += ordered_dct_Cr[(offy/2)*fullImage.w/2+offx/2]; 
         if(i%(fullImage.w/16) == (fullImage.w/16)-1) {
           offx += 16;
           offy = fullImage.y;
         } else offy += 16;
       }
-      printf("post dct\n");
 	    init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-      printf("post huffman\n");
 	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       FILE * out = fopen(newname, "w");
       for (i = 0; i < size; i++) {
         fputc(jpg[i], out);
       }
       fclose(out);
-      free(ordered_dct_Y);
-      free(ordered_dct_Cb);
-      free(ordered_dct_Cr);
       free(jpg);
       gettimeofday(&op_t, NULL);
       millielapsed = (op_t.tv_usec - store_t.tv_usec)/1000;
       secelapsed = (op_t.tv_sec - store_t.tv_sec);
       printf("conversion time for full image:       %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+      free(ordered_dct_Y);
+      free(ordered_dct_Cb);
+      free(ordered_dct_Cr);
+      free(raw);
     }
     gettimeofday(&end, NULL);
     millielapsed = (end.tv_usec - start.tv_usec)/1000;
     secelapsed = (end.tv_sec - start.tv_sec);
     printf("comparison and conversion total time: %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
     printf("\033[0;36mDone\033[0m\n");
-    free(raw);
     // sleep(1);
   }
 	return 0;
