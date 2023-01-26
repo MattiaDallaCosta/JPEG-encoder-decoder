@@ -1,20 +1,13 @@
-#include <esp_log.h>
-#include <driver/gpio.h>
-#include <esp_system.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
 // Include FreeRTOS for delay
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include "esp_camera.h"
-#include "img_converters.h"
 
-#include "../include/define.h"
-#include "../include/brain.h"
-#include "../include/encoder.h"
+#include "include/define.h"
+#include "include/brain.h"
+#include "include/encoder.h"
 
 #define LED 33 // LED connected to GPIO2
 
@@ -29,69 +22,13 @@ int16_t *ordered_dct_Cb;
 int16_t *ordered_dct_Cr;
 // area_t * diffDims;
 
-uint8_t EXT_RAM_BSS_ATTR saved[3*PIX_LEN/16];
-area_t EXT_RAM_BSS_ATTR diffDims[20];
-pair_t EXT_RAM_BSS_ATTR differences[100];
-huff_code EXT_RAM_BSS_ATTR Luma[2];
-huff_code EXT_RAM_BSS_ATTR Chroma[2];
+uint8_t saved[3*PIX_LEN/16];
+area_t diffDims[20];
+pair_t differences[100];
+huff_code Luma[2];
+huff_code Chroma[2];
 int len = 0;
 uint8_t different = 0;
-
-static camera_config_t camera_config = {
-  .pin_pwdn = PWDN_GPIO_NUM,
-  .pin_reset = RESET_GPIO_NUM,
-  .pin_xclk = XCLK_GPIO_NUM,
-  .pin_sccb_sda = SIOD_GPIO_NUM,
-  .pin_sccb_scl = SIOC_GPIO_NUM,
-  .pin_d7 = Y9_GPIO_NUM,
-  .pin_d6 = Y8_GPIO_NUM,
-  .pin_d5 = Y7_GPIO_NUM,
-  .pin_d4 = Y6_GPIO_NUM,
-  .pin_d3 = Y5_GPIO_NUM,
-  .pin_d2 = Y4_GPIO_NUM,
-  .pin_d1 = Y3_GPIO_NUM,
-  .pin_d0 = Y2_GPIO_NUM,
-  .pin_vsync = VSYNC_GPIO_NUM,
-  .pin_href = HREF_GPIO_NUM,
-  .pin_pclk = PCLK_GPIO_NUM,  
-  .xclk_freq_hz = 20000000,        //XCLK 20MHz or 10MHz
-  .ledc_timer = LEDC_TIMER_0,
-  .ledc_channel = LEDC_CHANNEL_0,
-  .pixel_format = PIXFORMAT_JPEG,  //YUV422,GRAYSCALE,RGB565,JPEG
-  .frame_size = FRAMESIZE_QVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
-  .jpeg_quality = 12,              //0-63 lower number means higher quality
-  .fb_count = 1,                   //if more than one, i2s runs in continuous mode. Use only with JPEG
-  .grab_mode = CAMERA_GRAB_LATEST,
-  .fb_location = CAMERA_FB_IN_PSRAM
-};
-
-static esp_err_t init_camera() {
-  //initialize the camera
-  ESP_LOGI(TAG, "Camera init... ");
-  esp_err_t err = esp_camera_init(&camera_config);
-
-  if (err != ESP_OK) {
-    //delay(100);  // need a delay here or the next serial o/p gets missed
-    ESP_LOGE(TAG, "CRITICAL FAILURE: Camera sensor failed to initialise.");
-    ESP_LOGE(TAG, "A full (hard, power off/on) reboot will probably be needed to recover from this.");
-    return err;
-  } else {
-    ESP_LOGI(TAG, "succeeded");
-
-    // Get a reference to the sensor
-    sensor_t* s = esp_camera_sensor_get();
-
-    // Dump camera module, warn for unsupported modules.
-    switch (s->id.PID) {
-      case OV9650_PID: ESP_LOGD(TAG, "WARNING: OV9650 camera module is not properly supported, will fallback to OV2640 operation"); break;
-      case OV7725_PID: ESP_LOGD(TAG, "WARNING: OV7725 camera module is not properly supported, will fallback to OV2640 operation"); break;
-      case OV2640_PID: ESP_LOGI(TAG, "OV2640 camera module detected"); break;
-      case OV3660_PID: ESP_LOGI(TAG, "OV3660 camera module detected"); break;
-      default: ESP_LOGD(TAG, "WARNING: Camera module is unknown and not properly supported, will fallback to OV2640 operation");
-    }
-  }
-  return ESP_OK;
-}
 
 int app_main() {
   int i;
