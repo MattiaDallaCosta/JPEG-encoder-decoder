@@ -26,7 +26,7 @@ int16_t *ordered_dct_Cr;
 
 uint8_t saved[3*PIX_LEN/16];
 area_t diffDims[20];
-pair_t differences[100];
+pair_t differences[16];
 huff_code Luma[2];
 huff_code Chroma[2];
 int len = 0;
@@ -121,14 +121,18 @@ int main(int argc, char ** argv) {
         diffDims[i].h = -1;
       }
       for (i = 0; i < PIX_LEN/256; i++) {
-        printf("loop %i\n", i);
-        different = compare_block(sub, saved, diffDims, differences, different, offy*(WIDTH/4)+offx);
-        if (!(i%(WIDTH/16)) && i) {
+        // printf("loop %i, offx = %i, offy = %i\n", i, offx, offy);
+        different = compare_block(sub, saved, diffDims, differences, different, offx, offy);
+        if ((i%(WIDTH/16) == (WIDTH/16)-1)) {
           offx = 0;
           offy += 4;
         } else offx += 4;
       }
       printf("different = %i\n", different);
+      // for (int i = 0; i < different; i++) {
+      //   enlargeAdjust(diffDims+i);
+      //   printf("diffDims[%i]: x = %i y = %i w = %i h = %i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+      // }
       store(sub, saved);
       free(sub);
       gettimeofday(&comp_t, NULL);
@@ -229,7 +233,20 @@ int main(int argc, char ** argv) {
           offy = fullImage.y;
         } else offy += 16;
       }
-	    init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
+      FILE * Y = fopen("dct_Y", "w");
+      FILE * Cb = fopen("dct_Cb", "w");
+      FILE * Cr = fopen("dct_Cr", "w");
+      for (int i = 0; i < fullImage.w*fullImage.h; i++) {
+        if (i < fullImage.w*fullImage.h/16) {
+          fprintf(Cb, "%i ", ordered_dct_Cb[i]);
+          fprintf(Cr, "%i ", ordered_dct_Cr[i]);
+        }
+        fprintf(Y, "%i ", ordered_dct_Y[i]);
+      }
+      fclose(Y);
+      fclose(Cb);
+      fclose(Cr);
+      init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
 	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       FILE * out = fopen(newname, "w");
       for (i = 0; i < size; i++) {

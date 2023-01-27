@@ -8,8 +8,8 @@
 void subsample(uint8_t *in, uint8_t *out) {
   int i = 0;
   uint16_t appo;
-  uint8_t bigh;
-  uint8_t bigw;
+  uint16_t bigh;
+  uint16_t bigw;
   for (; i < PIX_LEN/16; i++) {
     bigh = (i/(WIDTH/4))*4;
     bigw = (i%(WIDTH/4))*4;    
@@ -40,7 +40,7 @@ void subsample(uint8_t *in, uint8_t *out) {
 void store(uint8_t *in, uint8_t saved[3*PIX_LEN/16]) {
   int i = 0;
   for(; i < PIX_LEN/16; i++) {
-    printf("loop %i, row = %i, column = %i\n", i, i/(WIDTH/4), i%(WIDTH/4));
+    // printf("loop %i, row = %i, column = %i\n", i, i/(WIDTH/4), i%(WIDTH/4));
     saved[3*i]   = in[3*i];
     saved[3*i+1] = in[3*i+1];
     saved[3*i+2] = in[3*i+2];
@@ -48,8 +48,8 @@ void store(uint8_t *in, uint8_t saved[3*PIX_LEN/16]) {
 }
 
 int overlap(area_t a1, area_t a2){
-  int orizover = !(a1.x > a2.w + 1 || a1.w + 1 < a2.x);
-  int vertover = !(a1.y > a2.h + 1 || a1.h + 1 < a2.y);
+  int orizover = !(a1.x > a2.w + 2 || a1.w + 2 < a2.x);
+  int vertover = !(a1.y > a2.h + 2 || a1.h + 2 < a2.y);
   return orizover && vertover;
 }
 
@@ -91,6 +91,7 @@ area_t cumulativeMerge(pair_t * diffs, int index){
   a.y = diffs[index].row;
   a.h = diffs[index].row;
   diffs[index].done = 1;
+  // printf("a = %i %i %i %i\n", a.x, a.y, a.w, a.h);
   // printf("index = %i\n", index);
   // for (int i = 0; i < 8; i++) printf("son[%i] = %i\n", i, diffs[index].diff[i]);
   while (diffs[index].diff[i] > -1) {
@@ -99,23 +100,22 @@ area_t cumulativeMerge(pair_t * diffs, int index){
     // printf("app[%i] = %i %i %i %i\n", index, app.x, app.y, app.w, app.h);
     // printf("pre sumareas\n");
     sumAreas(&a, app);
+    // printf("a[%i] = %i %i %i %i\n", index, a.x, a.y, a.w, a.h);
     i++;
   }
   return a;
 }
 
-uint8_t compare_block(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t * differences, int numOuts, uint8_t off){
+uint8_t compare_block(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t * differences, int numOuts, uint8_t offx, uint8_t offy) {
   // printf("in compare\n");
-  uint8_t offx = off%(WIDTH/4);
-  uint8_t offy = off/(WIDTH/4);
   int isDifferent = 0;
   // pair_t differences[100];
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 16; i++) {
     differences[i].row = -1;
     differences[i].beg = -1;
     differences[i].end = -1;
     differences[i].done = 0;
-    for (int j = 0; j < 8; j++) {
+    for (int j = 0; j < 4; j++) {
       differences[i].diff[j] = -1;
     }
   }
@@ -137,16 +137,21 @@ uint8_t compare_block(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, p
       oldj = j;
       j = 0;
     }
-    if (in[3*(((i/4)+offy)*(WIDTH/4)+(i%4) + offx)]   != saved[3*(((i/4)+offy)*(WIDTH/4)+(i%4) + offx)]   ||
-        in[3*(((i/4)+offy)*(WIDTH/4)+(i%4) + offx)+1] != saved[3*(((i/4)+offy)*(WIDTH/4)+(i%4) + offx)+1] ||
-        in[3*(((i/4)+offy)*(WIDTH/4)+(i%4) + offx)+2] != saved[3*(((i/4)+offy)*(WIDTH/4)+(i%4) + offx)+2]) {
-      if(!isDifferent || !(i%16)) {
+    // printf("a1: R = %i, G = %i, B = %i\na2: R = %i, G = %i, B = %i\n --- \n", in[3*(((i/4)+offy)*(WIDTH/4)+(i%4)+offx)], in[3*(((i/4)+offy)*(WIDTH/4)+(i%4)+offx)+1], in[3*(((i/4)+offy)*(WIDTH/4)+(i%4)+offx)+2], saved[3*(((i/4)+offy)*(WIDTH/4)+(i%4)+offx)], saved[3*(((i/4)+offy)*(WIDTH/4)+(i%4)+offx)+1], saved[3*(((i/4)+offy)*(WIDTH/4)+(i%4)+offx)+2]);
+    if (in[3*(((i/4)+offy)*(WIDTH/4)+(i%4)+offx)]   != saved[3*(((i/4)+offy)*(WIDTH/4)+(i%4) + offx)]   ||
+        in[3*(((i/4)+offy)*(WIDTH/4)+(i%4)+offx)+1] != saved[3*(((i/4)+offy)*(WIDTH/4)+(i%4) + offx)+1] ||
+        in[3*(((i/4)+offy)*(WIDTH/4)+(i%4)+offx)+2] != saved[3*(((i/4)+offy)*(WIDTH/4)+(i%4) + offx)+2]) {
+      // printf("difference found in pixel %i\n", ((i/4)+offy)*(WIDTH/4)+(i%4)+offx);
+      if(!isDifferent) {
         isDifferent = 1;
         differences[numdiff+j].beg = i%4 + offx;
         differences[numdiff+j].row = i/4 + offy;
       }
       differences[numdiff+j].end = i%4 + offx;
-      if (i%4 == 3) j++;
+      if (i%4 == 3) {
+        isDifferent = 0;
+        j++;
+      }
     } else {
       if (isDifferent) { 
         // printf("found difference #%i in line #%i: beg = %i, end = %i\n", numdiff+j, differences[numdiff+j].row, differences[numdiff+j].beg, differences[numdiff+j].end);
@@ -181,8 +186,33 @@ uint8_t compare_block(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, p
     }
     if(!over) {
       if (isDifferent > 19) {
-        printf("too many\n");
-        return isDifferent;
+        printf("before too many check\n");
+        for (int i = 0; i < isDifferent - 1; i++) {
+          for (int j = i+1; j < isDifferent; j++) {
+            printf("loop[%i - %i], isDifferent = %i\n", i, j, isDifferent);
+            printf("outs[%i]: x = %i, y = %i, w = %i, h = %i\n", i, outs[i].x, outs[i].y, outs[i].w, outs[i].h);
+            printf("outs[%i]: x = %i, y = %i, w = %i, h = %i\n", j, outs[j].x, outs[j].y, outs[j].w, outs[j].h);
+            if (overlap(outs[i], outs[j])) {
+              printf("overlapping\n");
+              sumAreas(&outs[i], outs[j]);
+              if (j < isDifferent) {
+               outs[j].x = outs[isDifferent].x;
+               outs[j].y = outs[isDifferent].y;
+               outs[j].w = outs[isDifferent].w;
+               outs[j].h = outs[isDifferent].h;
+               outs[isDifferent].x = -1;
+               outs[isDifferent].y = -1;
+               outs[isDifferent].w = -1;
+               outs[isDifferent].h = -1;
+              }
+              isDifferent--;
+            }
+          }
+        }
+        if(isDifferent > 19) {
+          printf("too many\n");
+          return isDifferent;
+        }
       }
       // printf("adding\n");
       outs[isDifferent].x = a.x;

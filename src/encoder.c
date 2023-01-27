@@ -784,12 +784,11 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
 }
 
 int writePpm(FILE * f, uint8_t *sub) {
-  fprintf(f, "P6\n%i %i\n255\n", WIDTH/4, HEIGHT/4);
-  printf("maxnum = %i\n\n", PIX_LEN/16);
-  for (int i = 0; i < (PIX_LEN/16); i++){
-    printf("\033[1A%i\n",i);
-    int w = i%(WIDTH/4);
-    int h = i/(WIDTH/4);
+  fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
+  printf("max num = %i\n\n", PIX_LEN);
+  for (int i = 0; i < (PIX_LEN); i++){
+    int w = i%(WIDTH);
+    int h = i/(WIDTH);
     putc(sub[3*((h/4)*WIDTH/4+w/4)+0], f);
     putc(sub[3*((h/4)*WIDTH/4+w/4)+1], f);
     putc(sub[3*((h/4)*WIDTH/4+w/4)+2], f);
