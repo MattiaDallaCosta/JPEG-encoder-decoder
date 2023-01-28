@@ -585,14 +585,14 @@ void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code
 		fputc(0, f); fputc(67, f); // len
 		fputc(0, f); // quant-table id
 		int i;
-		for (i=0; i<64; i++)
-			fputc(luma_quantizer[scan_order[i]], f);
+		// for (i=0; i<64; i++)
+		// 	fputc(luma_quantizer[scan_order[i]], f);
 
 	fputc(0xFF, f); fputc(0xDB, f); // DQT Symbol
 		fputc(0, f); fputc(67, f); // len
 		fputc(1, f); // quant-table id
-		for (i=0; i<64; i++)
-			fputc(chroma_quantizer[scan_order[i]], f);
+		// for (i=0; i<64; i++)
+		// 	fputc(chroma_quantizer[scan_order[i]], f);
 
 	write_dht_header(f, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00);
 	write_dht_header(f, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10);
@@ -624,8 +624,8 @@ void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code
 		fputc(0x00, f); // start of spectral or predictor selection - not used
 		fputc(0x3F, f); // end of spectral selection - default value
 		fputc(0x00, f); // successive approximation bits - default value
-		write_coefficients(f, dims.w*dims.h, out[0], &Luma[0], &Luma[1]);
-		fill_last_byte(f);
+		// write_coefficients(f, dims.w*dims.h, out[0], &Luma[0], &Luma[1]);
+		// fill_last_byte(f);
 
 	fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
 		fputc(0, f); fputc(8, f); // len
@@ -635,8 +635,8 @@ void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code
 		fputc(0x00, f); // start of spectral or predictor selection - not used
 		fputc(0x3F, f); // end of spectral selection - default value
 		fputc(0x00, f); // successive approximation bits - default value
-		write_coefficients(f, dims.w*dims.h/4, out[1], &Chroma[0], &Chroma[1]);
-		fill_last_byte(f);
+		// write_coefficients(f, dims.w*dims.h/4, out[1], &Chroma[0], &Chroma[1]);
+		// fill_last_byte(f);
 
 	fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
 		fputc(0, f); fputc(8, f); // len
@@ -646,8 +646,8 @@ void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code
 		fputc(0x00, f); // start of spectral or predictor selection - not used
 		fputc(0x3F, f); // end of spectral selection - default value
 		fputc(0x00, f); // successive approximation bits - default value
-		write_coefficients(f, dims.w*dims.h/4, out[2], &Chroma[0], &Chroma[1]);
-		fill_last_byte(f);
+		// write_coefficients(f, dims.w*dims.h/4, out[2], &Chroma[0], &Chroma[1]);
+		// fill_last_byte(f);
 
 	fputc(0xFF, f); fputc(0xD9, f); // EOI Symbol
 
