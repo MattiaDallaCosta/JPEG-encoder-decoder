@@ -594,10 +594,10 @@ void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code
 		// for (i=0; i<64; i++)
 		// 	fputc(chroma_quantizer[scan_order[i]], f);
 
-	write_dht_header(f, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00);
-	write_dht_header(f, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10);
-	write_dht_header(f, Chroma[0].code_len_freq, Chroma[0].sym_sorted, 0x01);
-	write_dht_header(f, Chroma[1].code_len_freq, Chroma[1].sym_sorted, 0x11);
+	// write_dht_header(f, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00);
+	// write_dht_header(f, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10);
+	// write_dht_header(f, Chroma[0].code_len_freq, Chroma[0].sym_sorted, 0x01);
+	// write_dht_header(f, Chroma[1].code_len_freq, Chroma[1].sym_sorted, 0x11);
 
 	fputc(0xFF, f); fputc(0xC0, f); // SOF0 Symbol (Baseline DCT)
 		fputc(0, f); fputc(17, f); // len
