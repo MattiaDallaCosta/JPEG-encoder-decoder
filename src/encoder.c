@@ -687,6 +687,21 @@ void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims) {
   huff_code Luma[2];
   huff_code Chroma[2];
   rgb_to_dct(raw, ordered_dct, dims);
+  FILE * Y = fopen("dct_Y", "w");
+  FILE * Cb = fopen("dct_Cb", "w");
+  FILE * Cr = fopen("dct_Cr", "w");
+  for (int i = 0; i < dims.w*dims.h; i++) {
+  // for (int i = 0; i < 256; i++) {
+    if (i < dims.w*dims.h/4) {
+    // if (i < 64) {
+      fprintf(Cb, "%i ", ordered_dct[1][i]);
+      fprintf(Cr, "%i ", ordered_dct[2][i]);
+    }
+    fprintf(Y, "%i ", ordered_dct[0][i]);
+  }
+  fclose(Y);
+  fclose(Cb);
+  fclose(Cr);
 	init_huffman(ordered_dct, dims, Luma, Chroma);
 	write_file(name, ordered_dct, dims, Luma, Chroma);
 }

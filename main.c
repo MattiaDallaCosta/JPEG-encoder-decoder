@@ -130,8 +130,10 @@ int main(int argc, char ** argv) {
       area_t fullImage;
       fullImage.x = 0;
       fullImage.y = 0;
-      fullImage.w = WIDTH;
-      fullImage.h = HEIGHT;
+      // fullImage.w = WIDTH;
+      // fullImage.h = HEIGHT;
+      fullImage.w = 16;
+      fullImage.h = 16;
       getName(text, newname, -1);
       encodeNsend(newname, raw, fullImage);
       gettimeofday(&op_t, NULL);
