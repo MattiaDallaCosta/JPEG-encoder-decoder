@@ -178,19 +178,20 @@ void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[]) {
 // 	}
 // }
 
-void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int off) {
+void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy) {
   int i = 0;
   uint8_t app[2][32];
-  uint8_t offCbCr = ((off/WIDTH)/2)*(WIDTH/2) + (off%WIDTH)/2;
+  uint8_t offCx = offx/2;
+  uint8_t offCy = offy/2;
   uint8_t midY[256];
   uint8_t midCbCr[2][64];
   int begin, j;
   for (i = 0; i < 256; i++) {
   int r = i%16;
   int l = i/16;
-	midY[i]            =       0.299    * in[3*(i+off)] + 0.587    * in[3*(i+off)+1] + 0.114    * in[3*(i+off)+2];
-	app[0][(l%2)*16+r] = 128 - 0.168736 * in[3*(i+off)] - 0.331264 * in[3*(i+off)+1] + 0.5      * in[3*(i+off)+2];
-	app[1][(l%2)*16+r] = 128 + 0.5      * in[3*(i+off)] - 0.418688 * in[3*(i+off)+1] - 0.081312 * in[3*(i+off)+2];
+	midY[i]            =       0.299    * in[3*((offy+l)*WIDTH+offx+r)] + 0.587    * in[3*((offy+l)*WIDTH+offx+r)+1] + 0.114    * in[3*((offy+l)*WIDTH+offx+r)+2];
+	app[0][(l%2)*16+r] = 128 - 0.168736 * in[3*((offy+l)*WIDTH+offx+r)] - 0.331264 * in[3*((offy+l)*WIDTH+offx+r)+1] + 0.5      * in[3*((offy+l)*WIDTH+offx+r)+2];
+	app[1][(l%2)*16+r] = 128 + 0.5      * in[3*((offy+l)*WIDTH+offx+r)] - 0.418688 * in[3*((offy+l)*WIDTH+offx+r)+1] - 0.081312 * in[3*((offy+l)*WIDTH+offx+r)+2];
     if (r%2 == 1 && l%2 == 1) {
 			 midCbCr[0][(l/2*16)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][15+r] + app[0][16+r])/4;
 			 midCbCr[1][(l/2*16)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][15+r] + app[1][16+r])/4;
@@ -200,27 +201,26 @@ void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int off)
       j = ((begin%16) + (begin/16)*2)/8;
       int ih = j%2; 
       int iv = j/2; 
-      dct_block(16, midY + (iv)*128 + ih*8, Y + (iv*2+ih)*64, luma_quantizer);
+      dct_block(16, midY + (iv)*128 + ih*8, Y + (offy/8*WIDTH/8+offx/8+iv*2+ih)*64, luma_quantizer);
     }
-    if (r == (15)) off += (WIDTH - 16);
   }
-  dct_block(8, midCbCr[0], Cb + offCbCr, chroma_quantizer);
-  dct_block(8, midCbCr[1], Cr + offCbCr, chroma_quantizer);
+  dct_block(8, midCbCr[0], Cb + (offCy/8*WIDTH/16+offCx/8)*64, chroma_quantizer);
+  dct_block(8, midCbCr[1], Cr + (offCy/8*WIDTH/16+offCx/8)*64, chroma_quantizer);
 }
 void rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) {
   int i, j;  
   uint8_t offx = 0, offy = 0;
   int last[3] = {0, 0, 0};
   for (i = 0; i < (dims.w/16)*(dims.h/16); i++) {
-    rgb_to_dct_block(in, Y, Cb, Cr, (offy+dims.y)*WIDTH+(offx+dims.x));
+    rgb_to_dct_block(in, Y, Cb, Cr, offx, offy);
     for (j = 0; j < 4; j++) {
-    Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8] += last[0];
-    last[0] += Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8];
+      Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8] += last[0];
+      last[0] += Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8];
     }
-    last[1] += Cb[(offy/2)*dims.w+offx/2]; 
-    Cb[(offy/2)*dims.w+offx/2] -= last[1]; 
-    Cr[(offy/2)*dims.w+dims.x/2] -= last[2]; 
-    last[2] += Cr[(offy/2)*dims.w+offx/2]; 
+    Cb[(offy/2)*dims.w/2+offx/2] -= last[1]; 
+    last[1] += Cb[(offy/2)*dims.w/2+offx/2]; 
+    Cr[(offy/2)*dims.w/2+offx/2] -= last[2]; 
+    last[2] += Cr[(offy/2)*dims.w/2+offx/2]; 
     if(i%(dims.w/16) == (dims.w/16)-1) {
       offx += 16;
       offy = dims.y;
@@ -463,7 +463,6 @@ void calc_ac_freq(int num_pixel, int16_t dct_quant[], int freq[])
 void init_huffman(int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
 	int i;
 
-
 	huff_code* luma_dc =   Luma;
 	huff_code* luma_ac =   Luma+1;
 	huff_code* chroma_dc = Chroma;
@@ -493,18 +492,14 @@ unsigned char byte_buffer;
 int bits_written;
 size_t write_byte(uint8_t * jpg, int code_word, int start, int end, size_t initial) {
   size_t size = 0;
-	if (start == end)
-		return size;
+	if (start == end) return size;
 
-	if (end>0) // we just write into the buffer
-	{
+	if (end>0) { // we just write into the buffer
 		code_word <<= end;
 		code_word &= (1<<start)-1;
 		byte_buffer |= code_word;
 		bits_written += start-end;
-	}
-	else // we have to split & write to the disk
-	{
+	} else { // we have to split & write to the disk
 		int part2 = code_word & ((1<<(-end))-1);
 		code_word >>= (-end);
 		code_word &= (1<<start)-1;
@@ -560,7 +555,7 @@ size_t encode_ac_value(uint8_t * jpg, int ac_val, int num_zeros, huff_code* huff
 
 	unsigned int id = ac_val > 0 ? ac_val : -ac_val;
 	if (ac_val < 0) id = ~id;
-	size += write_bits(jpg, code, s, initial+size);
+	size += write_bits(jpg, id, s, initial+size);
   return size;
 }
 
@@ -609,7 +604,7 @@ size_t write_dht_header(uint8_t * jpg, int code_len_freq[], int sym_sorted[], in
   jpg[initial+(size++)] = 0xC4;
   jpg[initial+(size++)] = (length>>8)&0xFF;
   jpg[initial+(size++)] = length&0xFF;
-  jpg[initial+(size++)] = tc_th;
+  jpg[initial+(size++)] = (uint8_t)tc_th;
 
 	// fputc(0xFF, f); fputc(0xC4, f); // DHT Symbol
 

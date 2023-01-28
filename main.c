@@ -215,24 +215,7 @@ int main(int argc, char ** argv) {
       ordered_dct_Cb = (int16_t*)malloc(fullImage.h*fullImage.w/4);
       ordered_dct_Cr = (int16_t*)malloc(fullImage.h*fullImage.w/4);
       getName(text, newname, -1);
-      int last[3] = {0, 0, 0};
-      offx = 0;
-      offy = 0;
-      for (i = 0; i < (fullImage.w/16)*(fullImage.h/16); i++) {
-        rgb_to_dct_block(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, (offy+fullImage.y)*WIDTH+(offx+fullImage.x));
-        for (j = 0; j < 4; j++) {
-        ordered_dct_Y[((offy+(j%2))*fullImage.w)*8 + (offx+(j/2))*8] += last[0];
-        last[0] += ordered_dct_Y[((offy+(j%2))*fullImage.w)*8 + (offx+(j/2))*8];
-        }
-        ordered_dct_Cb[(offy/2)*fullImage.w/2+offx/2] -= last[1]; 
-        last[1] += ordered_dct_Cb[(offy/2)*fullImage.w/2+offx/2]; 
-        ordered_dct_Cr[(offy/2)*fullImage.w/2+offx/2] -= last[2]; 
-        last[2] += ordered_dct_Cr[(offy/2)*fullImage.w/2+offx/2]; 
-        if(i%(fullImage.w/16) == (fullImage.w/16)-1) {
-          offx += 16;
-          offy = fullImage.y;
-        } else offy += 16;
-      }
+      rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
       FILE * Y = fopen("dct_Y", "w");
       FILE * Cb = fopen("dct_Cb", "w");
       FILE * Cr = fopen("dct_Cr", "w");
