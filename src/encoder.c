@@ -721,8 +721,8 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
   size_t size = 0;
   int i;
 
-	for (i=0; i<20; i++) jpg[size+i] = head[i];
-  size += i;
+	// for (i=0; i<20; i++) jpg[size+i] = head[i];
+ //  size += i;
 	for (i=0; i<5; i++) jpg[size+i] = dqt_sym[i];
   size += i;
 	// for (i=0; i<64; i++) jpg[size+i] = luma_quantizer[scan_order[i]];
