@@ -725,19 +725,19 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
   size += i;
 	for (i=0; i<5; i++) jpg[size+i] = dqt_sym[i];
   size += i;
-	for (i=0; i<64; i++) jpg[size+i] = luma_quantizer[scan_order[i]];
-  dqt_sym[4] += 1;
+	// for (i=0; i<64; i++) jpg[size+i] = luma_quantizer[scan_order[i]];
+ //  dqt_sym[4] += 1;
   size += i;
 	for (i=0; i<5; i++) jpg[size+i] = dqt_sym[i];
   size += i;
   dqt_sym[4] -= 1;
-	for (i=0; i<64; i++) jpg[size+i] = chroma_quantizer[scan_order[i]];
-  size += i;
+	// for (i=0; i<64; i++) jpg[size+i] = chroma_quantizer[scan_order[i]];
+ //  size += i;
 
-	size += write_dht_header(jpg, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00, size); // da sistemare
-	size += write_dht_header(jpg, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10, size);
-	size += write_dht_header(jpg, Chroma[0].code_len_freq, Chroma[0].sym_sorted, 0x01, size);
-	size += write_dht_header(jpg, Chroma[1].code_len_freq, Chroma[1].sym_sorted, 0x11, size);
+	// size += write_dht_header(jpg, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00, size); // da sistemare
+	// size += write_dht_header(jpg, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10, size);
+	// size += write_dht_header(jpg, Chroma[0].code_len_freq, Chroma[0].sym_sorted, 0x01, size);
+	// size += write_dht_header(jpg, Chroma[1].code_len_freq, Chroma[1].sym_sorted, 0x11, size);
 
 	for (i=0; i<5; i++) jpg[size+i] = mid[i];
   jpg[(size++)+i] = ((dims.h)>>8)&0xFF;
@@ -751,26 +751,26 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
   coef_info[5]++;
   coef_info[6] = 0x11;
 
-	size += write_coefficients(jpg, dims.w*dims.h, Y, &Luma[0], &Luma[1], size); // da sistemare
-  fill_last_byte(jpg, size); // da sistemare             
-	size += 1;
+	// size += write_coefficients(jpg, dims.w*dims.h, Y, &Luma[0], &Luma[1], size); // da sistemare
+ //  fill_last_byte(jpg, size); // da sistemare             
+	// size += 1;
 
 	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];
   size += i;
   coef_info[5]++;
 
-  size += write_coefficients(jpg, dims.w*dims.h/4, Cb, &Chroma[0], &Chroma[1], size);
-  fill_last_byte(jpg, size); // da sistemare                       
-	size += 1;                                                       
+ //  size += write_coefficients(jpg, dims.w*dims.h/4, Cb, &Chroma[0], &Chroma[1], size);
+ //  fill_last_byte(jpg, size); // da sistemare                       
+	// size += 1;                                                       
                                                                    
 	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];             
   size += i;                                                       
   coef_info[5] = 0x01;                                             
   coef_info[6] = 0x00;                                             
                                                                    
-  size += write_coefficients(jpg, dims.w*dims.h/4, Cr, &Chroma[0], &Chroma[1], size);
-  fill_last_byte(jpg, size); // da sistemare
-	size += 1;
+ //  size += write_coefficients(jpg, dims.w*dims.h/4, Cr, &Chroma[0], &Chroma[1], size);
+ //  fill_last_byte(jpg, size); // da sistemare
+	// size += 1;
 
   for (i = 0; i < 2; i++) jpg[size+i] = eoi[i];
   size += i;
