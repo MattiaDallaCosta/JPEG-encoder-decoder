@@ -82,6 +82,7 @@ int main(int argc, char ** argv) {
         printf("\033[0;032mCreating saved file\033[0m\n");
         FILE * f_sub = fopen(savedName, "w");
         writePpm(f_sub, saved);
+        fclose(f_sub);
         gettimeofday(&store_t, NULL);
         millielapsed = (store_t.tv_usec - start.tv_usec)/1000;
         secelapsed = (store_t.tv_sec - start.tv_sec)/1000;
@@ -214,31 +215,35 @@ int main(int argc, char ** argv) {
       ordered_dct_Y = (int16_t*)malloc(fullImage.h*fullImage.w);
       ordered_dct_Cb = (int16_t*)malloc(fullImage.h*fullImage.w/4);
       ordered_dct_Cr = (int16_t*)malloc(fullImage.h*fullImage.w/4);
-      getName(text, newname, -1);
-      rgb_to_dct_block(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, 0, 0);
-      // rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
-      FILE * Y = fopen("dct_Y", "w");
-      FILE * Cb = fopen("dct_Cb", "w");
-      FILE * Cr = fopen("dct_Cr", "w");
-      // for (int i = 0; i < fullImage.w*fullImage.h; i++) {
-      for (int i = 0; i < 256; i++) {
-        // if (i < fullImage.w*fullImage.h/4) {
-        if (i < 64) {
-          fprintf(Cb, "%i ", ordered_dct_Cb[i]);
-          fprintf(Cr, "%i ", ordered_dct_Cr[i]);
+      // getName(text, newname, -1);
+      // rgb_to_dct_block(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, 0, 0);
+      rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
+      printf("post rgb_to_dct\n");
+      // FILE * Y = fopen("../dct_Y", "w");
+      // printf("Y: %i\n", Y);
+      // FILE * Cb = fopen("../dct_Cb", "w");
+      // printf("Cb: %i\n", Cb);
+      // FILE * Cr = fopen("../dct_Cr", "w");
+      // printf("Cr: %i\n", Cr);
+      printf("post fopen\n\n");
+      for (int i = 0; i < fullImage.w*fullImage.h/4; i++) {
+        printf("\033[1Ainloop[%i]\n",i);
+        if (i < fullImage.w*fullImage.h/16) {
+          // fprintf(Cb, "%i ", ordered_dct_Cb[i]);
+          // fprintf(Cr, "%i ", ordered_dct_Cr[i]);
         }
-        fprintf(Y, "%i ", ordered_dct_Y[i]);
+        // fprintf(Y, "%i ", ordered_dct_Y[i]);
       }
-      fclose(Y);
-      fclose(Cb);
-      fclose(Cr);
-     //  init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-	    // size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-     //  FILE * out = fopen(newname, "w");
-     //  for (i = 0; i < size; i++) {
-     //    fputc(jpg[i], out);
-     //  }
-     //  fclose(out);
+      // fclose(Y);
+      // fclose(Cb);
+      // fclose(Cr);
+      init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
+	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
+      FILE * out = fopen(newname, "w");
+      for (i = 0; i < size; i++) {
+        fputc(jpg[i], out);
+      }
+      fclose(out);
       free(jpg);
       gettimeofday(&op_t, NULL);
       millielapsed = (op_t.tv_usec - store_t.tv_usec)/1000;

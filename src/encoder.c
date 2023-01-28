@@ -201,7 +201,7 @@ void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx
       j = ((begin%16) + (begin/16)*2)/8;
       int ih = j%2; 
       int iv = j/2; 
-      dct_block(16, midY + (iv)*128 + ih*8, Y + (offy/8*WIDTH/8+offx/8+iv*2+ih)*64, luma_quantizer);
+      dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy/8+iv*2)*WIDTH/8+offx/8+ih)*64, luma_quantizer);
     }
   }
   dct_block(8, midCbCr[0], Cb + (offCy/8*WIDTH/16+offCx/8)*64, chroma_quantizer);
@@ -209,18 +209,18 @@ void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx
 }
 void rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) {
   int i, j;  
-  uint8_t offx = 0, offy = 0;
+  int16_t offx = 0, offy = 0;
   int last[3] = {0, 0, 0};
   for (i = 0; i < (dims.w/16)*(dims.h/16); i++) {
     rgb_to_dct_block(in, Y, Cb, Cr, offx, offy);
     for (j = 0; j < 4; j++) {
-      Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8] += last[0];
-      last[0] += Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8];
+      Y[((offy/8+(j%2))*dims.w/8 + offx/8+(j/2))*64] += last[0];
+      last[0] += Y[((offy/8+(j%2))*dims.w/8 + offx/8+(j/2))*64];
     }
-    Cb[(offy/2)*dims.w/2+offx/2] -= last[1]; 
-    last[1] += Cb[(offy/2)*dims.w/2+offx/2]; 
-    Cr[(offy/2)*dims.w/2+offx/2] -= last[2]; 
-    last[2] += Cr[(offy/2)*dims.w/2+offx/2]; 
+    Cb[(offy/16*dims.w/16+offx/16)*64] -= last[1]; 
+    last[1] += Cb[(offy/16*dims.w/16+offx/16)*64]; 
+    Cr[(offy/16*dims.w/16+offx/16)*64] -= last[2]; 
+    last[2] += Cr[(offy/16*dims.w/16+offx/16)*64]; 
     if(i%(dims.w/16) == (dims.w/16)-1) {
       offx += 16;
       offy = dims.y;
@@ -788,7 +788,6 @@ int writePpm(FILE * f, uint8_t *sub) {
     putc(sub[3*((h/4)*WIDTH/4+w/4)+1], f);
     putc(sub[3*((h/4)*WIDTH/4+w/4)+2], f);
   }
-  fclose(f);
   return 0;
 }
 
