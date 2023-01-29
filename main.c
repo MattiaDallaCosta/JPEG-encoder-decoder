@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -215,34 +216,52 @@ int main(int argc, char ** argv) {
       ordered_dct_Y = (int16_t*)malloc(fullImage.h*fullImage.w);
       ordered_dct_Cb = (int16_t*)malloc(fullImage.h*fullImage.w/4);
       ordered_dct_Cr = (int16_t*)malloc(fullImage.h*fullImage.w/4);
-      // getName(text, newname, -1);
-      // rgb_to_dct_block(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, 0, 0);
-      rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
-      printf("post rgb_to_dct\n");
-      // FILE * Y = fopen("../dct_Y", "w");
-      // printf("Y: %i\n", Y);
-      // FILE * Cb = fopen("../dct_Cb", "w");
-      // printf("Cb: %i\n", Cb);
-      // FILE * Cr = fopen("../dct_Cr", "w");
-      // printf("Cr: %i\n", Cr);
-      printf("post fopen\n\n");
-      for (int i = 0; i < fullImage.w*fullImage.h/4; i++) {
-        printf("\033[1Ainloop[%i]\n",i);
-        if (i < fullImage.w*fullImage.h/16) {
-          // fprintf(Cb, "%i ", ordered_dct_Cb[i]);
-          // fprintf(Cr, "%i ", ordered_dct_Cr[i]);
+      getName(text, newname, -1);
+      int last[3] = {0, 0, 0};
+      offx = 0;
+      offy = 0;
+      for (i = 0; i < (fullImage.w/16)*(fullImage.h/16); i++) {
+        offx = (i%(fullImage.w/16))*16;
+        offy = (i/(fullImage.w/16))*16;
+        rgb_to_dct_block_old(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr,offx, offy, fullImage.w);
+        for (j = 0; j < 4; j++) {
+        ordered_dct_Y[((offy+(j%2))*fullImage.w)*8 + (offx+(j/2))*8] += last[0];
+        last[0] += ordered_dct_Y[((offy+(j%2))*fullImage.w)*8 + (offx+(j/2))*8];
         }
-        // fprintf(Y, "%i ", ordered_dct_Y[i]);
+        ordered_dct_Cb[(offy/2)*fullImage.w/2+offx/2] -= last[1]; 
+        last[1] += ordered_dct_Cb[(offy/2)*fullImage.w/2+offx/2]; 
+        ordered_dct_Cr[(offy/2)*fullImage.w/2+offx/2] -= last[2]; 
+        last[2] += ordered_dct_Cr[(offy/2)*fullImage.w/2+offx/2]; 
       }
-      // fclose(Y);
-      // fclose(Cb);
-      // fclose(Cr);
+      FILE * Y = fopen("dct_Y", "w");
+      FILE * Cb = fopen("dct_Cb", "w");
+      FILE * Cr = fopen("dct_Cr", "w");
+      for (int i = 0; i < fullImage.w*fullImage.h; i++) {
+        if (i < fullImage.w*fullImage.h/16) {
+          fprintf(Cb, "%i ", ordered_dct_Cb[i]);
+          fprintf(Cr, "%i ", ordered_dct_Cr[i]);
+        }
+        fprintf(Y, "%i ", ordered_dct_Y[i]);
+      }
+      fclose(Y);
+      fclose(Cb);
+      fclose(Cr);
+      printf("Ciao Bello 1\n");
       init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
+      printf("Ciao Bello 2\n");
 	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-      FILE * out = fopen(newname, "w");
+      printf("name: %s\n\n",newname);
+      // int fd = open(newname, O_RDWR | O_CREAT);
+      // printf("fd: %d\n",fd);
+      FILE * out = fopen(newname, "w+");
+      // size--;
+      // printf("size = %zu, write-size = %zi\n\n",size, write(fd, jpg, size));
       for (i = 0; i < size; i++) {
+        printf("\033[1Ajpg[%i] = %i\n", i, jpg[i]);
+        // fprintf(out,"\033[1Ajpg[%i] = %i\n", i, jpg[i]);
         fputc(jpg[i], out);
       }
+      // close(fd);
       fclose(out);
       free(jpg);
       gettimeofday(&op_t, NULL);

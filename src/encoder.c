@@ -126,14 +126,18 @@ void getSavedName(char *name, char *buff) {
   strcpy(*pos == '/' ? pos+1 : pos,  "savedImage.ppm");
 }
 
-void zigzag_block(int16_t in[64], int16_t out[64]) {
+/* zigzag_block(int16_t in[64], int16_t * out)
+ *  function that reorders a block
+ */
+
+void zigzag_block(int16_t in[64], int16_t * out) {
 	int i = 0;
 	for (; i < 64; i++) {
     out[i] = in[scan_order[i]];
   }
 }
 
-void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[]) {
+void dct_block(int gap, uint8_t in[], int16_t * out, const int quantizer[]) {
 	int x_f, y_f; // frequency domain coordinates
 	int x_t, y_t; // time domain coordinates
 
@@ -178,53 +182,93 @@ void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[]) {
 // 	}
 // }
 
-void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy) {
+/*  rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, int dimw) 
+ *    in = array of rgb , [Y,Cb,Cr] recipients for the 3 output channels
+ *    [offx,offy] offset in the two axes from the beginning of in (in number of 16x16 blocks done) 
+ *  
+ *    function that converts a block of rgb in a block of dct reorderd to group the 0s togeder 
+ */
+
+void rgb_to_dct_block_old(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, int dimw) {
   int i = 0;
   uint8_t app[2][32];
-  uint8_t offCx = offx/2;
-  uint8_t offCy = offy/2;
+  uint16_t off = offy*dimw + offx;
+  uint16_t offCbCr = offy*dimw/4 + offx/2;
   uint8_t midY[256];
   uint8_t midCbCr[2][64];
   int begin, j;
   for (i = 0; i < 256; i++) {
   int r = i%16;
   int l = i/16;
-	midY[i]            =       0.299    * in[3*((offy+l)*WIDTH+offx+r)] + 0.587    * in[3*((offy+l)*WIDTH+offx+r)+1] + 0.114    * in[3*((offy+l)*WIDTH+offx+r)+2];
-	app[0][(l%2)*16+r] = 128 - 0.168736 * in[3*((offy+l)*WIDTH+offx+r)] - 0.331264 * in[3*((offy+l)*WIDTH+offx+r)+1] + 0.5      * in[3*((offy+l)*WIDTH+offx+r)+2];
-	app[1][(l%2)*16+r] = 128 + 0.5      * in[3*((offy+l)*WIDTH+offx+r)] - 0.418688 * in[3*((offy+l)*WIDTH+offx+r)+1] - 0.081312 * in[3*((offy+l)*WIDTH+offx+r)+2];
+	midY[i]            =       0.299    * in[3*(off+l*dimw+r)] + 0.587    * in[3*(off+l*dimw+r)+1] + 0.114    * in[3*(off+l*dimw+r)+2];
+	app[0][(l%2)*16+r] = 128 - 0.168736 * in[3*(off+l*dimw+r)] - 0.331264 * in[3*(off+l*dimw+r)+1] + 0.5      * in[3*(off+l*dimw+r)+2];
+	app[1][(l%2)*16+r] = 128 + 0.5      * in[3*(off+l*dimw+r)] - 0.418688 * in[3*(off+l*dimw+r)+1] - 0.081312 * in[3*(off+l*dimw+r)+2];
     if (r%2 == 1 && l%2 == 1) {
-			 midCbCr[0][(l/2*16)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][15+r] + app[0][16+r])/4;
-			 midCbCr[1][(l/2*16)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][15+r] + app[1][16+r])/4;
+			 midCbCr[0][(l/2*16)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][r-17] + app[0][r-16])/4;
+			 midCbCr[1][(l/2*16)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][r-17] + app[1][r-16])/4;
     }
     if (r%8 == 7 && l%8 == 7) {
       begin = i - 119;
       j = ((begin%16) + (begin/16)*2)/8;
       int ih = j%2; 
       int iv = j/2; 
-      dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy/8+iv*2)*WIDTH/8+offx/8+ih)*64, luma_quantizer);
+      dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy/8+iv)*dimw/8+offx/8+ih)*64, luma_quantizer);
+        
+    }
+    if (r == (15)) off += (WIDTH - 16);
+  }
+  dct_block(8, midCbCr[0], Cb + offCbCr, chroma_quantizer);
+  dct_block(8, midCbCr[1], Cr + offCbCr, chroma_quantizer);
+}
+
+void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, int dimw) {
+  int i = 0;
+  uint8_t app[2][32];                         //2 channels (Cb, Cr) of 2 lines of the 16x16 block of pixels
+  uint8_t midY[256];                          // Luminance not subsampled
+  uint8_t midCbCr[2][64];                     // sublsampled Cb[0] and Cr[1]
+  int begin, j;
+  for (i = 0; i < 256; i++) {                 // loop on the block (16*16 = 256)
+  int r = i%16;                               // value that rappresents the index of the pixel in the line (which column of the block)
+  int l = i/16;                               // value that rappresents the line we are currently in (which row of the block)
+	midY[i]            =       0.299    * in[3*(((offy*16+l)*dimw*16)+offx*16+r)] + 0.587    * in[3*(((offy*16+l)*dimw*16)+offx*16+r)+1] + 0.114    * in[3*(((offy*16+l)*dimw*16)+offx*16+r)+2]; // Rgb -> Y
+	app[0][(l%2)*16+r] = 128 - 0.168736 * in[3*(((offy*16+l)*dimw*16)+offx*16+r)] - 0.331264 * in[3*(((offy*16+l)*dimw*16)+offx*16+r)+1] + 0.5      * in[3*(((offy*16+l)*dimw*16)+offx*16+r)+2]; // Rgb -> Cb
+	app[1][(l%2)*16+r] = 128 + 0.5      * in[3*(((offy*16+l)*dimw*16)+offx*16+r)] - 0.418688 * in[3*(((offy*16+l)*dimw*16)+offx*16+r)+1] - 0.081312 * in[3*(((offy*16+l)*dimw*16)+offx*16+r)+2]; // Rgb -> Cr
+    if (r%2 == 1 && l%2 == 1) {
+			 midCbCr[0][(l/2)*8+r/2] = (app[0][r-1] + app[0][r] + app[0][r-17] + app[0][r-16])/4; // sublsampling Cb
+			 midCbCr[1][(l/2)*8+r/2] = (app[1][r-1] + app[1][r] + app[1][r-17] + app[1][r-16])/4; // sublsampling Cr
+    }
+    if (r%8 == 7 && l%8 == 7) {               // checks when it is at the end of a dct_block (8x8)
+      begin = i - 119;                        // goes to the beginning of the block (subtracts 119 = 7*(16+1) meaning it goes back of 7 lines (7*16) and 7 blocks (7*1))
+      j = ((begin%16) + (begin/16)*2)/8;      // index of the 8x8 block now worked on in the bigger 16x16 block
+      int ih = j%2;                           // x = the block (0 or 1)
+      int iv = j/2;                           // y = the block (0 or 1) 
+      dct_block(16, midY + (iv)*128 + ih*8, Y + (((offy*2+iv)*dimw*2)+offx*2+ih)*64, luma_quantizer); // executes the dct of one of the 8x8 blocks of Y
     }
   }
-  dct_block(8, midCbCr[0], Cb + (offCy/8*WIDTH/16+offCx/8)*64, chroma_quantizer);
-  dct_block(8, midCbCr[1], Cr + (offCy/8*WIDTH/16+offCx/8)*64, chroma_quantizer);
+  dct_block(8, midCbCr[0], Cb + (offy*dimw + offx)*64, chroma_quantizer); // executes the dct of the 8x8 block of Cb (only one because of subsampling)
+  dct_block(8, midCbCr[1], Cr + (offy*dimw + offx)*64, chroma_quantizer); // executes the dct of the 8x8 block of Cr (only one because of subsampling)
 }
+/* rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims)
+ *  applies the rgb_to_dct_block to all the 16x16 blocks of the image in the area defined by dims
+ */
+
 void rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) {
   int i, j;  
   int16_t offx = 0, offy = 0;
+  int bdimw = dims.w/16;
   int last[3] = {0, 0, 0};
-  for (i = 0; i < (dims.w/16)*(dims.h/16); i++) {
-    rgb_to_dct_block(in, Y, Cb, Cr, offx, offy);
+  for (i = 0; i < (bdimw)*(dims.h/16); i++) {
+    offx = i%(bdimw);
+    offy = i/(bdimw);
+    rgb_to_dct_block(in, Y, Cb, Cr, offx, offy, bdimw);
     for (j = 0; j < 4; j++) {
-      Y[((offy/8+(j%2))*dims.w/8 + offx/8+(j/2))*64] += last[0];
-      last[0] += Y[((offy/8+(j%2))*dims.w/8 + offx/8+(j/2))*64];
+      Y[((offy*2+(j/2))*bdimw*2 + offx*2+(j%2))*64] -= last[0];
+      last[0] += Y[((offy*2+(j%2))*bdimw*2 + offx*2+(j/2))*64];
     }
-    Cb[(offy/16*dims.w/16+offx/16)*64] -= last[1]; 
-    last[1] += Cb[(offy/16*dims.w/16+offx/16)*64]; 
-    Cr[(offy/16*dims.w/16+offx/16)*64] -= last[2]; 
-    last[2] += Cr[(offy/16*dims.w/16+offx/16)*64]; 
-    if(i%(dims.w/16) == (dims.w/16)-1) {
-      offx += 16;
-      offy = dims.y;
-    } else offy += 16;
+    Cb[(offy*bdimw+offx)*64] -= last[1]; 
+    last[1] += Cb[(offy*bdimw+offx)*64]; 
+    Cr[(offy*bdimw+offx)*64] -= last[2]; 
+    last[2] += Cr[(offy*bdimw+offx)*64]; 
   }
 }
 

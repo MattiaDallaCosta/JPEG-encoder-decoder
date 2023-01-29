@@ -4,4 +4,4 @@ all:
 image = images/boxes-0.ppm
 debug:
 	@gcc main.c src/encoder.c src/brain.c -g -o comparator
-	@valgrind comparator
+	@valgrind ./comparator
