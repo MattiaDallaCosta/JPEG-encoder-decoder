@@ -25,6 +25,6 @@ typedef struct {
 
 typedef struct {
   int beg, end, row, done;
-  int diff[8];
+  int diff[WIDTH/8];
 } pair_t;
 

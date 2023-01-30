@@ -35,7 +35,7 @@ int16_t ordered_dct_Cr[PIX_LEN/4];
 
 uint8_t saved[3*PIX_LEN/16];
 area_t diffDims[20];
-pair_t differences[16];
+pair_t differences[PIX_LEN/16];
 huff_code Luma[2];
 huff_code Chroma[2];
 int len = 0;
@@ -130,14 +130,15 @@ int main(int argc, char ** argv) {
         diffDims[i].w = -1;
         diffDims[i].h = -1;
       }
-      for (i = 0; i < PIX_LEN/256; i++) {
-        // printf("loop %i, offx = %i, offy = %i\n", i, offx, offy);
-        different = compare_block(sub, saved, diffDims, differences, different, offx, offy);
-        if ((i%(WIDTH/16) == (WIDTH/16)-1)) {
-          offx = 0;
-          offy += 4;
-        } else offx += 4;
-      }
+      // for (i = 0; i < PIX_LEN/256; i++) {
+      //   // printf("loop %i, offx = %i, offy = %i\n", i, offx, offy);
+      //   different = compare_block(sub, saved, diffDims, differences, different, offx, offy);
+      //   if ((i%(WIDTH/16) == (WIDTH/16)-1)) {
+      //     offx = 0;
+      //     offy += 4;
+      //   } else offx += 4;
+      // }
+      different = compare(sub, saved, diffDims, differences);
       printf("different = %i\n", different);
       // for (int i = 0; i < different; i++) {
       //   enlargeAdjust(diffDims+i);
