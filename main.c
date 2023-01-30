@@ -220,58 +220,75 @@ int main(int argc, char ** argv) {
       int last[3] = {0, 0, 0};
       offx = 0;
       offy = 0;
-      for (i = 0; i < (fullImage.w/16)*(fullImage.h/16); i++) {
-        offx = (i%(fullImage.w/16))*16;
-        offy = (i/(fullImage.w/16))*16;
+      for (i = 0; i < fullImage.w*fullImage.h/256; i++) {
+        offx = i%(fullImage.w/16);
+        offy = i/(fullImage.w/16);
         rgb_to_dct_block_old(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr,offx, offy, fullImage.w);
-        for (j = 0; j < 4; j++) {
-        ordered_dct_Y[((offy+(j%2))*fullImage.w)*8 + (offx+(j/2))*8] += last[0];
-        last[0] += ordered_dct_Y[((offy+(j%2))*fullImage.w)*8 + (offx+(j/2))*8];
-        }
-        ordered_dct_Cb[(offy/2)*fullImage.w/2+offx/2] -= last[1]; 
-        last[1] += ordered_dct_Cb[(offy/2)*fullImage.w/2+offx/2]; 
-        ordered_dct_Cr[(offy/2)*fullImage.w/2+offx/2] -= last[2]; 
-        last[2] += ordered_dct_Cr[(offy/2)*fullImage.w/2+offx/2]; 
       }
-      FILE * Y = fopen("dct_Y", "w");
-      FILE * Cb = fopen("dct_Cb", "w");
-      FILE * Cr = fopen("dct_Cr", "w");
-      for (int i = 0; i < fullImage.w*fullImage.h; i++) {
-        if (i < fullImage.w*fullImage.h/16) {
-          fprintf(Cb, "%i ", ordered_dct_Cb[i]);
-          fprintf(Cr, "%i ", ordered_dct_Cr[i]);
-        }
-        fprintf(Y, "%i ", ordered_dct_Y[i]);
-      }
-      fclose(Y);
-      fclose(Cb);
-      fclose(Cr);
+      // for (i = 0; i < fullImage.w*fullImage.h/64; i++) {
+      //   if(i >= fullImage.w && i < fullImage.w*16+256) printf("pre: %i - ", ordered_dct_Y[i*64]);
+      //   ordered_dct_Y[i*64] -= last[0];
+      //   if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", ordered_dct_Y[i*64]);
+      //   last[0] += ordered_dct_Y[i*64];
+      //   if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
+      //   if(i < fullImage.w*fullImage.h/256){
+      //     ordered_dct_Cb[i*64] -= last[1]; 
+      //     last[1] += ordered_dct_Cb[i*64]; 
+      //     ordered_dct_Cr[i*64] -= last[2]; 
+      //     last[2] += ordered_dct_Cr[i*64]; 
+      //   }
+      // }
+      // FILE * Y = fopen("dct_Y", "w");
+      // FILE * Cb = fopen("dct_Cb", "w");
+      // FILE * Cr = fopen("dct_Cr", "w");
+      // for (int i = 0; i < 256; i++) {
+      //   if (i < fullImage.w*fullImage.h/16) {
+      //     fprintf(Cb, "%i ", ordered_dct_Cb[i]);
+      //     fprintf(Cr, "%i ", ordered_dct_Cr[i]);
+      //   }
+      //   fprintf(Y, "%i ", ordered_dct_Y[i]);
+      // }
+      // fclose(Y);
+      // fclose(Cb);
+      // fclose(Cr);
       printf("Ciao Bello 1\n");
       init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       printf("Ciao Bello 2\n");
 	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-      printf("name: %s\n\n",newname);
+      printf("name: %s\n",newname);
+      printf("size = %zu\n\n\n\n\n\n\n\n\n\n\n", size);
       // int fd = open(newname, O_RDWR | O_CREAT);
       // printf("fd: %d\n",fd);
-      FILE * out = fopen(newname, "w+");
+      // FILE * out = fopen(newname, "w+");
       // size--;
       // printf("size = %zu, write-size = %zi\n\n",size, write(fd, jpg, size));
       for (i = 0; i < size; i++) {
-        printf("\033[1Ajpg[%i] = %i\n", i, jpg[i]);
+        printf("\033[10Ajpg[%i] = %s%i\n", i-9, jpg[i-8] > 100 ? (jpg[i-8] > 10 ? "  " : " "): "", jpg[i-9]);
+        printf("jpg[%i] = %s%i\n", i-8, jpg[i-8] > 100 ? (jpg[i-8] > 10 ? "  " : " "): "", jpg[i-8]);
+        printf("jpg[%i] = %s%i\n", i-7, jpg[i-7] > 100 ? (jpg[i-7] > 10 ? "  " : " "): "", jpg[i-7]);
+        printf("jpg[%i] = %s%i\n", i-6, jpg[i-6] > 100 ? (jpg[i-6] > 10 ? "  " : " "): "", jpg[i-6]);
+        printf("jpg[%i] = %s%i\n", i-5, jpg[i-5] > 100 ? (jpg[i-5] > 10 ? "  " : " "): "", jpg[i-5]);
+        printf("jpg[%i] = %s%i\n", i-4, jpg[i-4] > 100 ? (jpg[i-4] > 10 ? "  " : " "): "", jpg[i-4]);
+        printf("jpg[%i] = %s%i\n", i-3, jpg[i-3] > 100 ? (jpg[i-3] > 10 ? "  " : " "): "", jpg[i-3]);
+        printf("jpg[%i] = %s%i\n", i-2, jpg[i-2] > 100 ? (jpg[i-2] > 10 ? "  " : " "): "", jpg[i-2]);
+        printf("jpg[%i] = %s%i\n", i-1, jpg[i-1] > 100 ? (jpg[i-1] > 10 ? "  " : " "): "", jpg[i-1]);
+        printf("jpg[%i] = %s%i\n", i, jpg[i] > 100 ? (jpg[i] > 10 ? "  " : " "): "", jpg[i]);
         // fprintf(out,"\033[1Ajpg[%i] = %i\n", i, jpg[i]);
-        fputc(jpg[i], out);
+        // fputc(jpg[i], out);
       }
       // close(fd);
-      fclose(out);
-      free(jpg);
+      // fclose(out);
+      printf("pre free\n");
+      // free(jpg);
+      printf("post free\n");
       gettimeofday(&op_t, NULL);
       millielapsed = (op_t.tv_usec - store_t.tv_usec)/1000;
       secelapsed = (op_t.tv_sec - store_t.tv_sec);
       printf("conversion time for full image:       %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
-      free(ordered_dct_Y);
-      free(ordered_dct_Cb);
-      free(ordered_dct_Cr);
-      free(raw);
+      // free(ordered_dct_Y);
+      // free(ordered_dct_Cb);
+      // free(ordered_dct_Cr);
+      // free(raw);
     }
     gettimeofday(&end, NULL);
     millielapsed = (end.tv_usec - start.tv_usec)/1000;

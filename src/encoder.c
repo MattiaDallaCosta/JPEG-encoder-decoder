@@ -190,10 +190,11 @@ void dct_block(int gap, uint8_t in[], int16_t * out, const int quantizer[]) {
  */
 
 void rgb_to_dct_block_old(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, int dimw) {
+  printf("offx = %i, offy = %i, dimmw = %i\n", offx, offy, dimw);
   int i = 0;
   uint8_t app[2][32];
-  uint16_t off = offy*dimw + offx;
-  uint16_t offCbCr = offy*dimw/4 + offx/2;
+  uint16_t off = (offy*dimw + offx)*16;
+  uint16_t offCbCr = offy*dimw*4 + offx*8;
   uint8_t midY[256];
   uint8_t midCbCr[2][64];
   int begin, j;
@@ -212,10 +213,10 @@ void rgb_to_dct_block_old(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int 
       j = ((begin%16) + (begin/16)*2)/8;
       int ih = j%2; 
       int iv = j/2; 
-      dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy/8+iv)*dimw/8+offx/8+ih)*64, luma_quantizer);
+      printf("i = %i, begin = %i, j = %i\n", i, begin, j);
+      dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy*2+iv)*dimw/8+offx*2+ih)*64, luma_quantizer);
         
     }
-    if (r == (15)) off += (WIDTH - 16);
   }
   dct_block(8, midCbCr[0], Cb + offCbCr, chroma_quantizer);
   dct_block(8, midCbCr[1], Cr + offCbCr, chroma_quantizer);
