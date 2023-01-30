@@ -9,7 +9,6 @@
 // Include FreeRTOS for delay
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include "esp_spiffs.h"
 #include "esp_camera.h"
 #include "img_converters.h"
 
@@ -39,7 +38,7 @@ int16_t EXT_RAM_BSS_ATTR ordered_dct_Cr[PIX_LEN/4];
 
 uint8_t EXT_RAM_BSS_ATTR saved[3*PIX_LEN/16];
 area_t EXT_RAM_BSS_ATTR diffDims[20];
-pair_t EXT_RAM_BSS_ATTR differences[100];
+pair_t EXT_RAM_BSS_ATTR differences[PIX_LEN/32];
 huff_code EXT_RAM_BSS_ATTR Luma[2];
 huff_code EXT_RAM_BSS_ATTR Chroma[2];
 int len = 0;
@@ -103,12 +102,6 @@ static esp_err_t init_camera() {
 
 int app_main() {
   int i;
-  for (i = 0; i < 20; i++) {
-    diffDims[i].x = -1;
-    diffDims[i].y = -1;
-    diffDims[i].w = -1;
-    diffDims[i].h = -1;
-  }
   // Use settings defined above to initialize and mount SPIFFS filesystem.
   // Note: esp_vfs_spiffs_register is an all-in-one convenience function.
   init_camera();
@@ -131,6 +124,21 @@ int app_main() {
   ESP_LOGI(TAG, "--- finished initialization ---");
   // Main loop
   while(true) {
+    for (i = 0; i < 20; i++) {
+      diffDims[i].x = -1;
+      diffDims[i].y = -1;
+      diffDims[i].w = -1;
+      diffDims[i].h = -1;
+    }
+    for (i = 0; i < PIX_LEN/32; i++) {
+      differences[i].beg = -1;
+      differences[i].end = -1;
+      differences[i].row = -1;
+      differences[i].done = 0;
+      for (int j = 0; j < 8; j++) {
+        differences[i].diff[j] = -1;
+      }
+    }
     fb = esp_camera_fb_get();
     esp_camera_fb_return(fb);
     fb = esp_camera_fb_get();
@@ -155,41 +163,44 @@ int app_main() {
     //   }
     // // ESP_LOGI(TAG, "done loop %i : different = %i", i, different);
     // }
-    different = compare_block(sub, saved, diffDims, differences, different, offy*(WIDTH/4)+offx);
+    different = compare(sub, saved, diffDims, differences);
+    // different = compare_block(sub, saved, diffDims, differences, different, offy*(WIDTH/4)+offx);
     ESP_LOGI(TAG, "post compare: different = %i", different);
     store(sub, saved);
     // store_file(sub, "/spiffs/saved");
     // free(sub);
     ESP_LOGI(TAG, "post save");
-    area_t diff = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
+    area_t fullImage = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
     // jpg = (uint8_t*)heap_caps_malloc(3*diff.h*diff.w, MALLOC_CAP_SPIRAM);
     // ordered_dct_Y = (int16_t*)heap_caps_malloc(diff.h*diff.w, MALLOC_CAP_SPIRAM);
     // ordered_dct_Cb = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
     // ordered_dct_Cr = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
     ESP_LOGI(TAG, "post malloc");
-    int j;  
     int last[3] = {0, 0, 0};
     offx = 0;
     offy = 0;
-    for (i = 0; i < (diff.w/16)*(diff.h/16); i++) {
-      rgb_to_dct_block(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, (offy+diff.y)*WIDTH+(offx+diff.x));
-      for (j = 0; j < 4; j++) {
-      ordered_dct_Y[((offy+(j%2))*diff.w)*8 + (offx+(j/2))*8] += last[0];
-      last[0] += ordered_dct_Y[((offy+(j%2))*diff.w)*8 + (offx+(j/2))*8];
+    for (i = 0; i < fullImage.w*fullImage.h/256; i++) {
+      offx = i%(fullImage.w/16);
+      offy = i/(fullImage.w/16);
+      rgb_to_dct_block(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr,offx, offy, fullImage.w);
+    }
+    for (i = 0; i < fullImage.w*fullImage.h/64; i++) {
+      // if(i >= fullImage.w && i < fullImage.w*16+256) printf("pre: %i - ", ordered_dct_Y[i*64]);
+      ordered_dct_Y[i*64] -= last[0];
+      // if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", ordered_dct_Y[i*64]);
+      last[0] += ordered_dct_Y[i*64];
+      // if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
+      if(i < fullImage.w*fullImage.h/256){
+        ordered_dct_Cb[i*64] -= last[1]; 
+        last[1] += ordered_dct_Cb[i*64]; 
+        ordered_dct_Cr[i*64] -= last[2]; 
+        last[2] += ordered_dct_Cr[i*64]; 
       }
-      ordered_dct_Cb[(offy/2)*diff.w+offx/2] -= last[1]; 
-      last[1] += ordered_dct_Cb[(offy/2)*diff.w+offx/2]; 
-      ordered_dct_Cr[(offy/2)*diff.w+offx/2] -= last[2]; 
-      last[2] += ordered_dct_Cr[(offy/2)*diff.w+offx/2]; 
-      if(i%(diff.w/16) == (diff.w/16)-1) {
-        offx += 16;
-        offy = diff.y;
-      } else offy += 16;
     }
     ESP_LOGI(TAG, "post dct");
-	  init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diff, Luma, Chroma);
+	  init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
     ESP_LOGI(TAG, "post huffman");
-	  size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diff, Luma, Chroma);
+	  size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
     ESP_LOGI(TAG, "post encode: size = %zu", size);
     ESP_LOGW(TAG, "last characters: %i, %i", jpg[size - 2], jpg[size - 1]);
     // len = encodeNsend(jpg, raw, diff);

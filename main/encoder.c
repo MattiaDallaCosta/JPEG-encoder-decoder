@@ -179,31 +179,33 @@ void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
 	}
 }
 
-void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int off) {
+void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, int offx, int offy, int dimw) {
   int i = 0;
   uint8_t app[2][32];
-  uint8_t offCbCr = ((off/WIDTH)/2)*(WIDTH/2) + (off%WIDTH)/2;
+  uint16_t off = (offy*dimw + offx)*16;
+  uint16_t offCbCr = (offy*dimw/8 + offx)*64;
   uint8_t midY[256];
   uint8_t midCbCr[2][64];
   int begin, j;
   for (i = 0; i < 256; i++) {
   int r = i%16;
   int l = i/16;
-	midY[i]            =       0.299    * in[3*(i+off)] + 0.587    * in[3*(i+off)+1] + 0.114    * in[3*(i+off)+2];
-	app[0][(l%2)*16+r] = 128 - 0.168736 * in[3*(i+off)] - 0.331264 * in[3*(i+off)+1] + 0.5      * in[3*(i+off)+2];
-	app[1][(l%2)*16+r] = 128 + 0.5      * in[3*(i+off)] - 0.418688 * in[3*(i+off)+1] - 0.081312 * in[3*(i+off)+2];
+	midY[i]            =       0.299    * in[3*(off+l*dimw+r)] + 0.587    * in[3*(off+l*dimw+r)+1] + 0.114    * in[3*(off+l*dimw+r)+2];
+	app[0][(l%2)*16+r] = 128 - 0.168736 * in[3*(off+l*dimw+r)] - 0.331264 * in[3*(off+l*dimw+r)+1] + 0.5      * in[3*(off+l*dimw+r)+2];
+	app[1][(l%2)*16+r] = 128 + 0.5      * in[3*(off+l*dimw+r)] - 0.418688 * in[3*(off+l*dimw+r)+1] - 0.081312 * in[3*(off+l*dimw+r)+2];
     if (r%2 == 1 && l%2 == 1) {
-			 midCbCr[0][(l/2*16)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][15+r] + app[0][16+r])/4;
-			 midCbCr[1][(l/2*16)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][15+r] + app[1][16+r])/4;
+			 midCbCr[0][(l/2*16)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][r-17] + app[0][r-16])/4;
+			 midCbCr[1][(l/2*16)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][r-17] + app[1][r-16])/4;
     }
     if (r%8 == 7 && l%8 == 7) {
       begin = i - 119;
       j = ((begin%16) + (begin/16)*2)/8;
       int ih = j%2; 
       int iv = j/2; 
-      dct_block(16, midY + (iv)*128 + ih*8, Y + (iv*2+ih)*64, luma_quantizer);
+      // printf("i = %i, begin = %i, j = %i\n", i, begin, j);
+      dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy*2+iv)*dimw/8+offx*2+ih)*64, luma_quantizer);
+        
     }
-    if (r == (15)) off += (WIDTH - 16);
   }
   dct_block(8, midCbCr[0], Cb + offCbCr, chroma_quantizer);
   dct_block(8, midCbCr[1], Cr + offCbCr, chroma_quantizer);
@@ -213,7 +215,7 @@ void rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) 
   uint8_t offx = 0, offy = 0;
   int last[3] = {0, 0, 0};
   for (i = 0; i < (dims.w/16)*(dims.h/16); i++) {
-    rgb_to_dct_block(in, Y, Cb, Cr, (offy+dims.y)*WIDTH+(offx+dims.x));
+    // rgb_to_dct_block(in, Y, Cb, Cr, (offy+dims.y)*WIDTH+(offx+dims.x));
     for (j = 0; j < 4; j++) {
     Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8] += last[0];
     last[0] += Y[((offy+(j%2))*dims.w)*8 + (offx+(j/2))*8];

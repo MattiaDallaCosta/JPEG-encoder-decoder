@@ -85,10 +85,10 @@ void sumAreas(area_t * a1, area_t a2) {
 }
 
 area_t cumulativeMerge(pair_t * diffs, int index){
-  printf("inside cumulative merge\n");
+  // printf("inside cumulative merge\n");
   int i = 0;
   area_t a;
-  if (diffs[index].done) {
+  if (diffs[index].done || index > PIX_LEN/32) {
     a.x = -1;
     a.y = -1;
     a.w = -1;
@@ -101,7 +101,7 @@ area_t cumulativeMerge(pair_t * diffs, int index){
   a.h = diffs[index].row;
   diffs[index].done = 1;
   // printf("index = %i\n", index);
-  while (diffs[index].diff[i] > -1) {
+  while (diffs[index].diff[i] > -1 && i < 8 && i > -1) {
     // printf("son of %i is %i\n",index, diffs[index].diff[i]);
     // printf("\033[1Aapp[%i] = %i %i %i %i\n", index, a.x, a.y, a.w, a.h);
     area_t app = cumulativeMerge(diffs, diffs[index].diff[i]);
@@ -201,19 +201,9 @@ uint8_t compare_block(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t outs[20],
   return isDifferent;
 }
 
-uint8_t compare(uint8_t *in,uint8_t saved[3*PIX_LEN/16], area_t outs[20]){
+uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t * differences) {
   printf("in compare\n");
   int isDifferent = 0;
-  pair_t differences[PIX_LEN/32];
-  for (int i = 0; i < PIX_LEN/32; i++) {
-    differences[i].row = -1;
-    differences[i].beg = -1;
-    differences[i].end = -1;
-    differences[i].done = 0;
-    for (int j = 0; j < WIDTH/8; j++) {
-      differences[i].diff[j] = -1;
-    }
-  }
   int i = 0, j = 0, numdiff = 0, oldj = 0;
   for(; i < PIX_LEN/16; i++) {
     if (!(i%(WIDTH/4))) {
@@ -228,61 +218,143 @@ uint8_t compare(uint8_t *in,uint8_t saved[3*PIX_LEN/16], area_t outs[20]){
       numdiff += j;
       oldj = j;
       j = 0;
+      // printf("j = %i, numdiff = %i\n", j, numdiff);
     }
-    if (in[i] != saved[i] || in[i+1] != saved[i+1] || in[i+2] != saved[i+2]) {
+    if (in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))]   != saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))]   ||
+        in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+1] != saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+1] ||
+        in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+2] != saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+2]) {
       if(!isDifferent) {
         isDifferent = 1;
         differences[numdiff+j].beg = i%(WIDTH/4);
         differences[numdiff+j].row = i/(WIDTH/4);
       }
       differences[numdiff+j].end = i%(WIDTH/4);
+      if (i%(WIDTH/4) == WIDTH/4 - 1) {
+        j++;
+        isDifferent = 0;
+      }
+      // printf("diffs[%i] = {%i, %i, %i}\n", numdiff+j, differences[numdiff+j].beg, differences[numdiff+j].end, differences[numdiff+j].row);
     } else {
       if (isDifferent) { 
-        //printf("found difference #%i in line #%i: beg = %i, end = %i\n", numdiff+j, differences[numdiff+j].row, differences[numdiff+j].beg, differences[numdiff+j].end);
         isDifferent = 0;
         j++;
       }
     }
   }
-  //printf("post diff found\n");
+  printf("numdiff = %i\n", numdiff);
   if (!numdiff) return 0;
   isDifferent = 0;
   for (i = numdiff-1; i >= 0; i--) {
-    // printf("done[%i] = %i\n", i, differences[i].done);
     if(differences[i].done) continue;
     if(differences[i].row == -1 || differences[i].beg == -1 || differences[i].end == -1) continue;
     int over = 0;
     area_t a = cumulativeMerge(differences, i);
-    //printf("sons of diff %i:\n",i);
-    j = 0;
-    while (differences[i].diff[j] > -1) {
-      // printf("\t%i\n", differences[i].diff[j]);
-      j++;
-    }
     if (a.x == -1 || a.y == -1 || a.w == -1 || a.h == -1) continue;
+    printf("a: x = %i, y = %i, w = %i, h = %i\n", a.x, a.y, a.w, a.h);
     for (j = 0; j < isDifferent; j++) {
       if (overlap(a, outs[j])) {
         sumAreas(&outs[j], a);
         over = 1;
-        //printf("over[%i] = %i\n", j, over);
         break;
       }
     }
     if(!over) {
-      //printf("adding\n");
+      printf("adding\n");
       outs[isDifferent].x = a.x;
       outs[isDifferent].y = a.y;
       outs[isDifferent].w = a.w;
       outs[isDifferent].h = a.h;
       isDifferent++;
-      if (isDifferent > 19) {
-        //printf("too many\n");
+      if (isDifferent > 20) {
         return isDifferent;
       }
     }
   }
   return isDifferent;
 }
+
+// uint8_t compare(uint8_t *in,uint8_t saved[3*PIX_LEN/16], area_t outs[20]){
+//   printf("in compare\n");
+//   int isDifferent = 0;
+//   pair_t differences[PIX_LEN/32];
+//   for (int i = 0; i < PIX_LEN/32; i++) {
+//     differences[i].row = -1;
+//     differences[i].beg = -1;
+//     differences[i].end = -1;
+//     differences[i].done = 0;
+//     for (int j = 0; j < WIDTH/8; j++) {
+//       differences[i].diff[j] = -1;
+//     }
+//   }
+//   int i = 0, j = 0, numdiff = 0, oldj = 0;
+//   for(; i < PIX_LEN/16; i++) {
+//     if (!(i%(WIDTH/4))) {
+//       for (int k = 0; k < j; k++) {
+//         int a = 0;
+//         for (int z = 0; z < oldj; z++) {
+//           if(differences[numdiff+k].end < differences[numdiff-oldj+z].beg-1 || differences[numdiff+k].beg > differences[numdiff-oldj+z].end+1) break;
+//           differences[numdiff+k].diff[a++] = numdiff-oldj+z; 
+//         }
+//       } 
+//       isDifferent = 0;
+//       numdiff += j;
+//       oldj = j;
+//       j = 0;
+//     }
+//     if (in[i] != saved[i] || in[i+1] != saved[i+1] || in[i+2] != saved[i+2]) {
+//       if(!isDifferent) {
+//         isDifferent = 1;
+//         differences[numdiff+j].beg = i%(WIDTH/4);
+//         differences[numdiff+j].row = i/(WIDTH/4);
+//       }
+//       differences[numdiff+j].end = i%(WIDTH/4);
+//     } else {
+//       if (isDifferent) { 
+//         //printf("found difference #%i in line #%i: beg = %i, end = %i\n", numdiff+j, differences[numdiff+j].row, differences[numdiff+j].beg, differences[numdiff+j].end);
+//         isDifferent = 0;
+//         j++;
+//       }
+//     }
+//   }
+//   //printf("post diff found\n");
+//   if (!numdiff) return 0;
+//   isDifferent = 0;
+//   for (i = numdiff-1; i >= 0; i--) {
+//     // printf("done[%i] = %i\n", i, differences[i].done);
+//     if(differences[i].done) continue;
+//     if(differences[i].row == -1 || differences[i].beg == -1 || differences[i].end == -1) continue;
+//     int over = 0;
+//     area_t a = cumulativeMerge(differences, i);
+//     //printf("sons of diff %i:\n",i);
+//     j = 0;
+//     while (differences[i].diff[j] > -1) {
+//       // printf("\t%i\n", differences[i].diff[j]);
+//       j++;
+//     }
+//     if (a.x == -1 || a.y == -1 || a.w == -1 || a.h == -1) continue;
+//     for (j = 0; j < isDifferent; j++) {
+//       if (overlap(a, outs[j])) {
+//         sumAreas(&outs[j], a);
+//         over = 1;
+//         //printf("over[%i] = %i\n", j, over);
+//         break;
+//       }
+//     }
+//     if(!over) {
+//       //printf("adding\n");
+//       outs[isDifferent].x = a.x;
+//       outs[isDifferent].y = a.y;
+//       outs[isDifferent].w = a.w;
+//       outs[isDifferent].h = a.h;
+//       isDifferent++;
+//       if (isDifferent > 19) {
+//         //printf("too many\n");
+//         return isDifferent;
+//       }
+//     }
+//   }
+//   return isDifferent;
+// }
 
 inline void enlargeAdjust(area_t * a){
   a->x *= 4;
