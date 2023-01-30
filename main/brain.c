@@ -111,12 +111,12 @@ area_t cumulativeMerge(pair_t * diffs, int index){
   return a;
 }
 
-uint8_t compare_block(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t outs[20], int numOuts, uint8_t off){
+uint8_t compare_block(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t outs[20], pair_t * differences, int numOuts, uint8_t off){
   printf("in compare\n");
   uint8_t offx = off%(WIDTH/4);
   uint8_t offy = off/(WIDTH/4);
   int isDifferent = 0;
-  pair_t differences[100];
+  // pair_t differences[100];
   for (int i = 0; i < 100; i++) {
     differences[i].row = -1;
     differences[i].beg = -1;

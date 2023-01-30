@@ -21,16 +21,25 @@
 
 static const char *TAG = "image comparator";
 
-uint8_t *raw;
-uint8_t *sub;
-uint8_t *jpg;
+// uint8_t *raw;
+// uint8_t *sub;
+// uint8_t *jpg;
 
-int16_t *ordered_dct_Y;
-int16_t *ordered_dct_Cb;
-int16_t *ordered_dct_Cr;
+uint8_t EXT_RAM_BSS_ATTR raw[3*PIX_LEN];
+uint8_t EXT_RAM_BSS_ATTR sub[3*PIX_LEN/16];
+uint8_t EXT_RAM_BSS_ATTR jpg[3*PIX_LEN];
+
+// int16_t *ordered_dct_Y;
+// int16_t *ordered_dct_Cb;
+// int16_t *ordered_dct_Cr;
+
+int16_t EXT_RAM_BSS_ATTR ordered_dct_Y[PIX_LEN];
+int16_t EXT_RAM_BSS_ATTR ordered_dct_Cb[PIX_LEN/4];
+int16_t EXT_RAM_BSS_ATTR ordered_dct_Cr[PIX_LEN/4];
 
 uint8_t EXT_RAM_BSS_ATTR saved[3*PIX_LEN/16];
 area_t EXT_RAM_BSS_ATTR diffDims[20];
+pair_t EXT_RAM_BSS_ATTR differences[100];
 huff_code EXT_RAM_BSS_ATTR Luma[2];
 huff_code EXT_RAM_BSS_ATTR Chroma[2];
 int len = 0;
@@ -62,13 +71,6 @@ static camera_config_t camera_config = {
   .fb_count = 1,                   //if more than one, i2s runs in continuous mode. Use only with JPEG
   .grab_mode = CAMERA_GRAB_LATEST,
   .fb_location = CAMERA_FB_IN_PSRAM
-};
-
-esp_vfs_spiffs_conf_t conf = {
-  .base_path = "/spiffs",
-  .partition_label = NULL,
-  .max_files = 5,
-  .format_if_mount_failed = false
 };
 
 static esp_err_t init_camera() {
@@ -109,35 +111,23 @@ int app_main() {
   }
   // Use settings defined above to initialize and mount SPIFFS filesystem.
   // Note: esp_vfs_spiffs_register is an all-in-one convenience function.
-  esp_err_t ret = esp_vfs_spiffs_register(&conf);
-
-  if (ret != ESP_OK) {
-      if (ret == ESP_FAIL) {
-          ESP_LOGE(TAG, "Failed to mount or format filesystem");
-      } else if (ret == ESP_ERR_NOT_FOUND) {
-          ESP_LOGE(TAG, "Failed to find SPIFFS partition");
-      } else {
-          ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
-      }
-      return 1;
-  }
   init_camera();
   camera_fb_t* fb = esp_camera_fb_get();
   esp_camera_fb_return(fb);
   fb = esp_camera_fb_get();
   ESP_LOGI(TAG, "taken photo");
   ESP_LOGI(TAG, "image size: %zu, %zux%zu", fb->len, fb->width, fb->height);
-  raw = (uint8_t*)heap_caps_malloc(3*PIX_LEN, MALLOC_CAP_SPIRAM);
+  // raw = (uint8_t*)heap_caps_malloc(3*PIX_LEN, MALLOC_CAP_SPIRAM);
   fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
   esp_camera_fb_return(fb);
   ESP_LOGI(TAG, "post jpg to rgb");
-  sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
+  // sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
   subsample(raw, sub);
   store(sub, saved);
   // store_file(sub, "/spiffs/saved");
   ESP_LOGI(TAG, "post store");
-  free(raw);
-  free(sub);
+  // free(raw);
+  // free(sub);
   ESP_LOGI(TAG, "--- finished initialization ---");
   // Main loop
   while(true) {
@@ -146,12 +136,12 @@ int app_main() {
     fb = esp_camera_fb_get();
     ESP_LOGI(TAG, "image capture"); 
     ESP_LOGI(TAG, "pre decoding");
-    raw = (uint8_t*)heap_caps_malloc(3*PIX_LEN, MALLOC_CAP_SPIRAM);
+    // raw = (uint8_t*)heap_caps_malloc(3*PIX_LEN, MALLOC_CAP_SPIRAM);
     fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
     ESP_LOGI(TAG, "post decoding");
     esp_camera_fb_return(fb);
     ESP_LOGI(TAG, "pre sub");
-    sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
+    // sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
     subsample(raw,sub);
     ESP_LOGI(TAG, "post sub");
     uint8_t offx = 0, offy = 0;
@@ -165,17 +155,17 @@ int app_main() {
     //   }
     // // ESP_LOGI(TAG, "done loop %i : different = %i", i, different);
     // }
-    different = compare_block(sub, saved, diffDims, different, offy*(WIDTH/4)+offx);
+    different = compare_block(sub, saved, diffDims, differences, different, offy*(WIDTH/4)+offx);
     ESP_LOGI(TAG, "post compare: different = %i", different);
     store(sub, saved);
     // store_file(sub, "/spiffs/saved");
-    free(sub);
+    // free(sub);
     ESP_LOGI(TAG, "post save");
     area_t diff = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
-    jpg = (uint8_t*)heap_caps_malloc(3*diff.h*diff.w, MALLOC_CAP_SPIRAM);
-    ordered_dct_Y = (int16_t*)heap_caps_malloc(diff.h*diff.w, MALLOC_CAP_SPIRAM);
-    ordered_dct_Cb = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
-    ordered_dct_Cr = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
+    // jpg = (uint8_t*)heap_caps_malloc(3*diff.h*diff.w, MALLOC_CAP_SPIRAM);
+    // ordered_dct_Y = (int16_t*)heap_caps_malloc(diff.h*diff.w, MALLOC_CAP_SPIRAM);
+    // ordered_dct_Cb = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
+    // ordered_dct_Cr = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
     ESP_LOGI(TAG, "post malloc");
     int j;  
     int last[3] = {0, 0, 0};
@@ -203,11 +193,11 @@ int app_main() {
     ESP_LOGI(TAG, "post encode: size = %zu", size);
     ESP_LOGW(TAG, "last characters: %i, %i", jpg[size - 2], jpg[size - 1]);
     // len = encodeNsend(jpg, raw, diff);
-    free(ordered_dct_Y);
-    free(ordered_dct_Cb);
-    free(ordered_dct_Cr);
-    free(raw);
-    free(jpg);
+    // free(ordered_dct_Y);
+    // free(ordered_dct_Cb);
+    // free(ordered_dct_Cr);
+    // free(raw);
+    // free(jpg);
     ESP_LOGI(TAG, "post free");
     // if (different) {
     //   ESP_LOGI(TAG, "Images are different");
