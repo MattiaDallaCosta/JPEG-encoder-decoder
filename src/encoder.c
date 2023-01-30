@@ -190,11 +190,11 @@ void dct_block(int gap, uint8_t in[], int16_t * out, const int quantizer[]) {
  */
 
 void rgb_to_dct_block_old(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, int dimw) {
-  printf("offx = %i, offy = %i, dimmw = %i\n", offx, offy, dimw);
+  // printf("offx = %i, offy = %i, dimmw = %i\n", offx, offy, dimw);
   int i = 0;
   uint8_t app[2][32];
   uint16_t off = (offy*dimw + offx)*16;
-  uint16_t offCbCr = offy*dimw*4 + offx*8;
+  uint16_t offCbCr = (offy*dimw/8 + offx)*64;
   uint8_t midY[256];
   uint8_t midCbCr[2][64];
   int begin, j;
@@ -213,7 +213,7 @@ void rgb_to_dct_block_old(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int 
       j = ((begin%16) + (begin/16)*2)/8;
       int ih = j%2; 
       int iv = j/2; 
-      printf("i = %i, begin = %i, j = %i\n", i, begin, j);
+      // printf("i = %i, begin = %i, j = %i\n", i, begin, j);
       dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy*2+iv)*dimw/8+offx*2+ih)*64, luma_quantizer);
         
     }
@@ -825,7 +825,7 @@ size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t 
 
 int writePpm(FILE * f, uint8_t *sub) {
   fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
-  printf("max num = %i\n\n", PIX_LEN);
+  // printf("max num = %i\n\n", PIX_LEN);
   for (int i = 0; i < (PIX_LEN); i++){
     int w = i%(WIDTH);
     int h = i/(WIDTH);

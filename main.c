@@ -16,13 +16,21 @@
 #include "include/brain.h"
 #include "include/encoder.h"
 
-uint8_t *raw;
-uint8_t *sub;
-uint8_t *jpg;
+uint8_t raw[3*PIX_LEN];
+uint8_t sub[3*PIX_LEN/16];
+uint8_t jpg[3*PIX_LEN];
 
-int16_t *ordered_dct_Y;
-int16_t *ordered_dct_Cb;
-int16_t *ordered_dct_Cr;
+int16_t ordered_dct_Y[PIX_LEN];
+int16_t ordered_dct_Cb[PIX_LEN/4];
+int16_t ordered_dct_Cr[PIX_LEN/4];
+
+// uint8_t *raw;
+// uint8_t *sub;
+// uint8_t *jpg;
+
+// int16_t *ordered_dct_Y;
+// int16_t *ordered_dct_Cb;
+// int16_t *ordered_dct_Cr;
 // area_t * diffDims;
 
 uint8_t saved[3*PIX_LEN/16];
@@ -96,7 +104,7 @@ int main(int argc, char ** argv) {
       fprintf(stderr, "\033[0;031mUnable to open file\033[0m\n");
       continue;
     }
-    raw = (uint8_t*)malloc(3*PIX_LEN);
+    // raw = (uint8_t*)malloc(3*PIX_LEN);
 	  if (readPpm(f_in, raw)) {
       printf("\033[0;031mError reading input file\033[0m\n");
 	  	fclose(f_in);
@@ -108,7 +116,7 @@ int main(int argc, char ** argv) {
     millielapsed = (read_t.tv_usec - start.tv_usec)/1000;
     secelapsed = (read_t.tv_sec - start.tv_sec);
     printf("reading time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
-    sub = (uint8_t*)malloc(3*PIX_LEN/16);
+    // sub = (uint8_t*)malloc(3*PIX_LEN/16);
     subsample(raw, sub);
     gettimeofday(&sub_t, NULL);
     millielapsed = (sub_t.tv_usec - read_t.tv_usec)/1000;
@@ -136,7 +144,7 @@ int main(int argc, char ** argv) {
       //   printf("diffDims[%i]: x = %i y = %i w = %i h = %i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
       // }
       store(sub, saved);
-      free(sub);
+      // free(sub);
       gettimeofday(&comp_t, NULL);
       millielapsed = (comp_t.tv_usec - sub_t.tv_usec)/1000;
       secelapsed = (comp_t.tv_sec - sub_t.tv_sec);
@@ -201,7 +209,7 @@ int main(int argc, char ** argv) {
       printf("\033[0;036mNo image stored\nStoring and encoding\033[0m\n");
       stored = 1;
       store(sub, saved);
-      free(sub);
+      // free(sub);
       gettimeofday(&store_t, NULL);
       millielapsed = (store_t.tv_usec - sub_t.tv_usec)/1000;
       secelapsed = (store_t.tv_sec - sub_t.tv_sec);
@@ -212,10 +220,10 @@ int main(int argc, char ** argv) {
       fullImage.y = 0;
       fullImage.w = WIDTH;
       fullImage.h = HEIGHT;
-      jpg = (uint8_t*)malloc(3*fullImage.h*fullImage.w);
-      ordered_dct_Y = (int16_t*)malloc(fullImage.h*fullImage.w);
-      ordered_dct_Cb = (int16_t*)malloc(fullImage.h*fullImage.w/4);
-      ordered_dct_Cr = (int16_t*)malloc(fullImage.h*fullImage.w/4);
+      // jpg = (uint8_t*)malloc(3*fullImage.h*fullImage.w);
+      // ordered_dct_Y = (int16_t*)malloc(fullImage.h*fullImage.w);
+      // ordered_dct_Cb = (int16_t*)malloc(fullImage.h*fullImage.w/4);
+      // ordered_dct_Cr = (int16_t*)malloc(fullImage.h*fullImage.w/4);
       getName(text, newname, -1);
       int last[3] = {0, 0, 0};
       offx = 0;
@@ -225,32 +233,32 @@ int main(int argc, char ** argv) {
         offy = i/(fullImage.w/16);
         rgb_to_dct_block_old(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr,offx, offy, fullImage.w);
       }
-      // for (i = 0; i < fullImage.w*fullImage.h/64; i++) {
-      //   if(i >= fullImage.w && i < fullImage.w*16+256) printf("pre: %i - ", ordered_dct_Y[i*64]);
-      //   ordered_dct_Y[i*64] -= last[0];
-      //   if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", ordered_dct_Y[i*64]);
-      //   last[0] += ordered_dct_Y[i*64];
-      //   if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
-      //   if(i < fullImage.w*fullImage.h/256){
-      //     ordered_dct_Cb[i*64] -= last[1]; 
-      //     last[1] += ordered_dct_Cb[i*64]; 
-      //     ordered_dct_Cr[i*64] -= last[2]; 
-      //     last[2] += ordered_dct_Cr[i*64]; 
-      //   }
-      // }
-      // FILE * Y = fopen("dct_Y", "w");
-      // FILE * Cb = fopen("dct_Cb", "w");
-      // FILE * Cr = fopen("dct_Cr", "w");
-      // for (int i = 0; i < 256; i++) {
-      //   if (i < fullImage.w*fullImage.h/16) {
-      //     fprintf(Cb, "%i ", ordered_dct_Cb[i]);
-      //     fprintf(Cr, "%i ", ordered_dct_Cr[i]);
-      //   }
-      //   fprintf(Y, "%i ", ordered_dct_Y[i]);
-      // }
-      // fclose(Y);
-      // fclose(Cb);
-      // fclose(Cr);
+      for (i = 0; i < fullImage.w*fullImage.h/64; i++) {
+        if(i >= fullImage.w && i < fullImage.w*16+256) printf("pre: %i - ", ordered_dct_Y[i*64]);
+        ordered_dct_Y[i*64] -= last[0];
+        if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", ordered_dct_Y[i*64]);
+        last[0] += ordered_dct_Y[i*64];
+        if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
+        if(i < fullImage.w*fullImage.h/256){
+          ordered_dct_Cb[i*64] -= last[1]; 
+          last[1] += ordered_dct_Cb[i*64]; 
+          ordered_dct_Cr[i*64] -= last[2]; 
+          last[2] += ordered_dct_Cr[i*64]; 
+        }
+      }
+      FILE * Y = fopen("dct_Y", "w");
+      FILE * Cb = fopen("dct_Cb", "w");
+      FILE * Cr = fopen("dct_Cr", "w");
+      for (int i = 0; i < 256; i++) {
+        if (i < fullImage.w*fullImage.h/16) {
+          fprintf(Cb, "%i ", ordered_dct_Cb[i]);
+          fprintf(Cr, "%i ", ordered_dct_Cr[i]);
+        }
+        fprintf(Y, "%i ", ordered_dct_Y[i]);
+      }
+      fclose(Y);
+      fclose(Cb);
+      fclose(Cr);
       printf("Ciao Bello 1\n");
       init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       printf("Ciao Bello 2\n");
@@ -259,25 +267,25 @@ int main(int argc, char ** argv) {
       printf("size = %zu\n\n\n\n\n\n\n\n\n\n\n", size);
       // int fd = open(newname, O_RDWR | O_CREAT);
       // printf("fd: %d\n",fd);
-      // FILE * out = fopen(newname, "w+");
+      FILE * out = fopen(newname, "w+");
       // size--;
       // printf("size = %zu, write-size = %zi\n\n",size, write(fd, jpg, size));
       for (i = 0; i < size; i++) {
-        printf("\033[10Ajpg[%i] = %s%i\n", i-9, jpg[i-8] > 100 ? (jpg[i-8] > 10 ? "  " : " "): "", jpg[i-9]);
-        printf("jpg[%i] = %s%i\n", i-8, jpg[i-8] > 100 ? (jpg[i-8] > 10 ? "  " : " "): "", jpg[i-8]);
-        printf("jpg[%i] = %s%i\n", i-7, jpg[i-7] > 100 ? (jpg[i-7] > 10 ? "  " : " "): "", jpg[i-7]);
-        printf("jpg[%i] = %s%i\n", i-6, jpg[i-6] > 100 ? (jpg[i-6] > 10 ? "  " : " "): "", jpg[i-6]);
-        printf("jpg[%i] = %s%i\n", i-5, jpg[i-5] > 100 ? (jpg[i-5] > 10 ? "  " : " "): "", jpg[i-5]);
-        printf("jpg[%i] = %s%i\n", i-4, jpg[i-4] > 100 ? (jpg[i-4] > 10 ? "  " : " "): "", jpg[i-4]);
-        printf("jpg[%i] = %s%i\n", i-3, jpg[i-3] > 100 ? (jpg[i-3] > 10 ? "  " : " "): "", jpg[i-3]);
-        printf("jpg[%i] = %s%i\n", i-2, jpg[i-2] > 100 ? (jpg[i-2] > 10 ? "  " : " "): "", jpg[i-2]);
-        printf("jpg[%i] = %s%i\n", i-1, jpg[i-1] > 100 ? (jpg[i-1] > 10 ? "  " : " "): "", jpg[i-1]);
-        printf("jpg[%i] = %s%i\n", i, jpg[i] > 100 ? (jpg[i] > 10 ? "  " : " "): "", jpg[i]);
+        printf("\033[10Ajpg[%i] = %s%i\n", i-9, jpg[i-8] < 100 ? (jpg[i-8] < 10 ? "  " : " "): "", jpg[i-9]);
+        printf("jpg[%i] = %s%i\n", i-8, jpg[i-8] < 100 ? (jpg[i-8] < 10 ? "  " : " "): "", jpg[i-8]);
+        printf("jpg[%i] = %s%i\n", i-7, jpg[i-7] < 100 ? (jpg[i-7] < 10 ? "  " : " "): "", jpg[i-7]);
+        printf("jpg[%i] = %s%i\n", i-6, jpg[i-6] < 100 ? (jpg[i-6] < 10 ? "  " : " "): "", jpg[i-6]);
+        printf("jpg[%i] = %s%i\n", i-5, jpg[i-5] < 100 ? (jpg[i-5] < 10 ? "  " : " "): "", jpg[i-5]);
+        printf("jpg[%i] = %s%i\n", i-4, jpg[i-4] < 100 ? (jpg[i-4] < 10 ? "  " : " "): "", jpg[i-4]);
+        printf("jpg[%i] = %s%i\n", i-3, jpg[i-3] < 100 ? (jpg[i-3] < 10 ? "  " : " "): "", jpg[i-3]);
+        printf("jpg[%i] = %s%i\n", i-2, jpg[i-2] < 100 ? (jpg[i-2] < 10 ? "  " : " "): "", jpg[i-2]);
+        printf("jpg[%i] = %s%i\n", i-1, jpg[i-1] < 100 ? (jpg[i-1] < 10 ? "  " : " "): "", jpg[i-1]);
+        printf("jpg[%i] = %s%i\n", i, jpg[i] < 100 ? (jpg[i] < 10 ? "  " : " "): "", jpg[i]);
         // fprintf(out,"\033[1Ajpg[%i] = %i\n", i, jpg[i]);
-        // fputc(jpg[i], out);
+        fputc(jpg[i], out);
       }
       // close(fd);
-      // fclose(out);
+      fclose(out);
       printf("pre free\n");
       // free(jpg);
       printf("post free\n");
