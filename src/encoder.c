@@ -167,7 +167,7 @@ void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[]) {
 }
 
 void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
-	int i,j;
+	int i;
 	for (i=0; i<PIX_LEN; i++) {
 		out[0][i] = in[0][(i/64)*64+scan_order[i%64]];
     if (i< PIX_LEN/4) {
@@ -175,6 +175,41 @@ void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
 		   out[2][i] = in[2][(i/64)*64+scan_order[i%64]];
     }
 	}
+}
+
+void rgb_to_dct_block_old(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, area_t dims) {
+  // printf("offx = %i, offy = %i, dimmw = %i\n", offx, offy, dimw);
+  int i = 0;
+  uint8_t app[2][32];
+  uint32_t offCbCr = (offy*dims.w/16 + offx)*64;
+  uint8_t midY[256];
+  uint8_t midCbCr[2][64];
+  int begin, j;
+  for (i = 0; i < 256; i++) {
+  int r = i%16;
+  int l = i/16;
+  int index = 3*((offy*16+dims.y+l)*WIDTH+offx*16+dims.x+r);
+	midY[i]            =       0.299    * in[index] + 0.587    * in[index+1] + 0.114    * in[index+2];
+	app[0][(l%2)*16+r] = 128 - 0.168736 * in[index] - 0.331264 * in[index+1] + 0.5      * in[index+2];
+	app[1][(l%2)*16+r] = 128 + 0.5      * in[index] - 0.418688 * in[index+1] - 0.081312 * in[index+2];
+    if (r%2 == 1 && l%2 == 1) {
+			 midCbCr[0][(l/2)*8+r/2] = (app[0][r-1] + app[0][r] + app[0][r+15] + app[0][r+16])/4;
+      // printf("midCbCr index: %i\n",(l/2)*8+r/2);
+			 midCbCr[1][(l/2)*8+r/2] = (app[1][r-1] + app[1][r] + app[1][r+15] + app[1][r+16])/4;
+    }
+    if (r%8 == 7 && l%8 == 7) {
+      begin = i - 119;
+      j = ((begin%16) + (begin/16)*2)/8;
+      int ih = j%2; 
+      int iv = j/2; 
+      // printf("i = %i, begin = %i, j = %i\n", i, begin, j);
+      dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy*2+iv)*dims.w/8+offx*2+ih)*64, luma_quantizer);
+        
+    }
+  }
+  printf("C*-index[%i][%i]: %i\n", offy, offx, offCbCr/64);
+  dct_block(8, midCbCr[0], Cb + offCbCr, chroma_quantizer);
+  dct_block(8, midCbCr[1], Cr + offCbCr, chroma_quantizer);
 }
 
 void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
@@ -202,7 +237,7 @@ void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
       int ih = j%(dims.w/8); 
       int iv = j/(dims.w/8); 
       // dct_block(WIDTH, mid[0] + ih*8, out[0] + (iv*(WIDTH/8)+ih)*64, luma_quantizer);
-      dct_block(dims.w, mid[0] + (iv)*dims.w*8 + ih*8, out[0] + (iv*(dims.w/8)+ih)*64, luma_quantizer);
+      dct_block(dims.w, mid[0] + iv*dims.w*8 + ih*8, out[0] + (iv*(dims.w/8)+ih)*64, luma_quantizer);
       out[0][(iv*(dims.w/8)+ih)*64] -= last[0];
       last[0] += out[0][(iv*(dims.w/8)+ih)*64];
       if (ih%2 == 1 && iv%2 == 1) {
@@ -703,5 +738,35 @@ void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims) {
   fclose(Cb);
   fclose(Cr);
 	init_huffman(ordered_dct, dims, Luma, Chroma);
+	write_file(name, ordered_dct, dims, Luma, Chroma);
+}
+
+void encodeNsend_blocks(char * name, uint8_t raw[3*PIX_LEN], area_t dims) {
+  int16_t ordered_dct[3][PIX_LEN];
+  huff_code Luma[2];
+  huff_code Chroma[2];
+	int last[3] = {0, 0, 0};
+  int i = 0;
+  int offx = 0;
+  int offy = 0;
+  for (i = 0; i < dims.w*dims.h/256; i++) {
+    offx = i%(dims.w/16);
+    offy = i/(dims.w/16);
+    rgb_to_dct_block_old(raw, ordered_dct[0], ordered_dct[1], ordered_dct[2],offx, offy, dims);
+  }
+  for (i = 0; i < dims.w*dims.h/64; i++) {
+    // if(i >= dims.w && i < dims.w*16+256) printf("pre: %i - ", ordered_dct[0][i*64]);
+    ordered_dct[0][i*64] -= last[0];
+    // if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", ordered_dct_Y[i*64]);
+    last[0] += ordered_dct[0][i*64];
+    // if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
+    if(i < dims.w*dims.h/256){
+      ordered_dct[1][i*64] -= last[1]; 
+      last[1] += ordered_dct[1][i*64]; 
+      ordered_dct[2][i*64] -= last[2]; 
+      last[2] += ordered_dct[2][i*64]; 
+    }
+  }
+  init_huffman(ordered_dct, dims, Luma, Chroma);
 	write_file(name, ordered_dct, dims, Luma, Chroma);
 }
