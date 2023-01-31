@@ -447,10 +447,10 @@ void init_huffman(int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_cod
 
 unsigned char byte_buffer;
 int bits_written;
-void write_byte(FILE* f, int code_word, int start, int end)
-{
+size_t write_byte(FILE* f, uint8_t * jpg, int code_word, int start, int end, int initial) {
+  size_t size = 0;
 	if (start == end)
-		return;
+		return size;
 
 	if (end>0) // we just write into the buffer
 	{
@@ -466,60 +466,67 @@ void write_byte(FILE* f, int code_word, int start, int end)
 		code_word &= (1<<start)-1;
 		byte_buffer |= code_word;
 		fputc(byte_buffer, f);
-		if (byte_buffer == 0xFF)
+    jpg[initial+(size++)] = byte_buffer;
+		if (byte_buffer == 0xFF) {
 			fputc(0, f); // stuffing bit
+      jpg[initial+(size++)] = 0;
+    }
 		bits_written = 0;
 		byte_buffer = 0;
-		write_byte(f, part2, 8, 8+end);
-		return;
+		size += write_byte(f, jpg, part2, 8, 8+end, initial+size);
+		return size;
 	}
+  return size;
 }
 
 
-void write_bits(FILE* f, int code_word, int code_len)
+size_t write_bits(FILE* f, uint8_t * jpg, int code_word, int code_len, int start)
 {
 	if (code_len == 0)
-		return;
-	write_byte(f, code_word, 8-bits_written, 8-bits_written-code_len);
+		return 0;
+	return write_byte(f, jpg, code_word, 8-bits_written, 8-bits_written-code_len, start);
 }
 
-void fill_last_byte(FILE* f)
+void fill_last_byte(FILE* f, uint8_t * jpg, int index)
 {
 	byte_buffer |= (1<<(8-bits_written))-1;
 	fputc(byte_buffer, f);
+  jpg[index] = byte_buffer;
 	byte_buffer = 0;
 	bits_written = 0;
 }
 
-void encode_dc_value(FILE* f, int dc_val, huff_code* huff)
+size_t encode_dc_value(FILE* f, uint8_t * jpg, int dc_val, huff_code* huff, int start)
 {
+  size_t size = 0;
 	int class = huff_class(dc_val);
 	int class_code = huff->sym_code[class];
 	int class_size = huff->sym_code_len[class];
-	write_bits(f, class_code, class_size);
+	size += write_bits(f, jpg, class_code, class_size, start+size);
 
 	unsigned int id = dc_val < 0 ? -dc_val : dc_val;
-	if (dc_val < 0)
-		id = ~id;
-	write_bits(f, id, class);
+	if (dc_val < 0) id = ~id;
+	size += write_bits(f, jpg, id, class, start+size);
+  return size;
 }
 
-void encode_ac_value(FILE* f, int ac_val, int num_zeros, huff_code* huff)
-{
+size_t encode_ac_value(FILE* f, uint8_t* jpg, int ac_val, int num_zeros, huff_code* huff,int start) {
+  size_t size = 0;
 	int class = huff_class(ac_val);
 	int v = ((num_zeros<<4)&0xF0) | (class&0x0F);
 	int code = huff->sym_code[v];
-	int size = huff->sym_code_len[v];
-	write_bits(f, code, size);
+	int s = huff->sym_code_len[v];
+	size += write_bits(f, jpg, code, s, start+size);
 
-	unsigned int id = abs(ac_val);
-	if (ac_val < 0)
-		id = ~id;
-	write_bits(f, id, class);
+	unsigned int id =  ac_val < 0 ? -ac_val : ac_val;
+	if (ac_val < 0) id = ~id;
+	size += write_bits(f, jpg, id, class, start+size);
+  return size;
 }
 
-void write_coefficients(FILE* f, int num_pixel, int16_t dct_quant[], huff_code* huff_dc, huff_code* huff_ac)
+size_t write_coefficients(FILE* f, uint8_t * jpg, int num_pixel, int16_t dct_quant[], huff_code* huff_dc, huff_code* huff_ac, int start)
 {
+  size_t size = 0;
 	int num_zeros = 0;
 	int last_nonzero;
 	int i;
@@ -527,7 +534,7 @@ void write_coefficients(FILE* f, int num_pixel, int16_t dct_quant[], huff_code* 
 	{
 		if (i%64 == 0)
 		{
-			encode_dc_value(f, dct_quant[i], huff_dc);
+			size += encode_dc_value(f, jpg, dct_quant[i], huff_dc, start+size);
 			for (last_nonzero = i+63; last_nonzero>i; last_nonzero--)
 				if (dct_quant[last_nonzero] != 0)
 					break;
@@ -536,7 +543,7 @@ void write_coefficients(FILE* f, int num_pixel, int16_t dct_quant[], huff_code* 
 	
 		if (i == last_nonzero + 1)
 		{
-			write_bits(f, huff_ac->sym_code[0x00], huff_ac->sym_code_len[0x00]); // EOB symbol
+			size += write_bits(f, jpg, huff_ac->sym_code[0x00], huff_ac->sym_code_len[0x00], start+size); // EOB symbol
 			// jump to the next block
 			i = (i/64+1)*64-1;
 			continue;
@@ -547,37 +554,49 @@ void write_coefficients(FILE* f, int num_pixel, int16_t dct_quant[], huff_code* 
 			num_zeros++;
 			if (num_zeros == 16)
 			{
-				write_bits(f, huff_ac->sym_code[0xF0], huff_ac->sym_code_len[0xF0]); // ZRL symbol
+				size += write_bits(f, jpg, huff_ac->sym_code[0xF0], huff_ac->sym_code_len[0xF0], start+size); // ZRL symbol
 				num_zeros = 0;
 			}
 			continue;
 		}
 
-		encode_ac_value(f, dct_quant[i], num_zeros, huff_ac);
+		size += encode_ac_value(f, jpg, dct_quant[i], num_zeros, huff_ac, start+size);
 		num_zeros = 0;
 	}
+  return size;
 }
 
-void write_dht_header(FILE* f, int code_len_freq[], int sym_sorted[], int tc_th)
+size_t write_dht_header(FILE* f, uint8_t * jpg, int code_len_freq[], int sym_sorted[], int tc_th, int start)
 {
+  size_t size = 0;
 	int length = 19;
 	int i;
 	for (i=1; i<=16; i++)
 		length += code_len_freq[i];
 
 	fputc(0xFF, f); fputc(0xC4, f); // DHT Symbol
+  jpg[start+(size++)] = 0xFF;
+  jpg[start+(size++)] = 0xC4;
 
 	fputc( (length>>8)&0xFF , f); fputc( length&0xFF, f); // len
+  jpg[start+(size++)] = (length>>8)&0xFF;
+  jpg[start+(size++)] = length&0xFF;
 
 	fputc(tc_th, f); // table class (0=DC, 1=AC) and table id (0=luma, 1=chroma)
+  jpg[start+(size++)] = tc_th;
 
-	for (i=1; i<=16; i++)
+	for (i=1; i<=16; i++){
 		fputc(code_len_freq[i], f); // number of codes of length i
+    jpg[start+(size++)] = code_len_freq[i];
+  }
 
-	for (i=0; length>19; i++, length--)
+	for (i=0; length>19; i++, length--) {
 		fputc(sym_sorted[i], f); // huffval, needed to reconstruct the huffman code at the receiver
+    jpg[start+(size++)] = sym_sorted[i];
+  }
+  printf("size = %i\n", size);
+  return size;
 }
-
 
 // size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
 //   size_t size = 0;
@@ -646,92 +665,162 @@ int mid[] = { 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 
 int coef_info[] = { 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00 };
 int eoi[] = { 0xFF, 0xD9 };
 
+size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
+	size_t size = 0;
+  int i;
+	FILE* f = fopen(file_name, "w");
+	// fputc(0xFF, f); fputc(0xD8, f);               // SOI Symbol
 
-size_t write_file(char * filename, int16_t Y[PIX_LEN], int16_t Cb[PIX_LEN/4], int16_t Cr[PIX_LEN/4], area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
-	FILE* f = fopen(filename, "w");
-	fputc(0xFF, f); fputc(0xD8, f); // SOI Symbol
+	// fputc(0xFF, f);	fputc(0xE0, f);               // APP0 Tag
+	// fputc(0, f); fputc(16, f);                    // len
+	// fputc(0x4A, f); fputc(0x46, f); fputc(0x49, f); fputc(0x46, f); fputc(0x00, f); // JFIF ID
+	// fputc(0x01, f); fputc(0x01, f);               // JFIF Version
+	// fputc(0x00, f);                               // units
+	// fputc(0x00, f); fputc(0x48, f);               // X density
+	// fputc(0x00, f); fputc(0x48, f);               // Y density
+	// fputc(0x00, f);                               // x thumbnail
+	// fputc(0x00, f);                               // y thumbnail
+	for (i=0; i<20; i++) {
+    fputc(head[i], f);
+    jpg[size+i] = head[i];
+  }
+  size += i;
 
-	fputc(0xFF, f);	fputc(0xE0, f); // APP0 Tag
-		fputc(0, f); fputc(16, f); // len
-		fputc(0x4A, f); fputc(0x46, f); fputc(0x49, f); fputc(0x46, f); fputc(0x00, f); // JFIF ID
-		fputc(0x01, f); fputc(0x01, f); // JFIF Version
-		fputc(0x00, f); // units
-		fputc(0x00, f); fputc(0x48, f); // X density
-		fputc(0x00, f); fputc(0x48, f); // Y density
-		fputc(0x00, f); // x thumbnail
-		fputc(0x00, f); // y thumbnail
+	// fputc(0xFF, f); fputc(0xDB, f);               // DQT Symbol
+	// fputc(0, f); fputc(67, f);                    // len
+	// fputc(0, f);                                  // quant-table id
+	for (i=0; i<5; i++) {
+    fputc(dqt_sym[i], f);
+    jpg[size+i] = dqt_sym[i];
+  }
+  size += i;
 
-	fputc(0xFF, f); fputc(0xDB, f); // DQT Symbol
-		fputc(0, f); fputc(67, f); // len
-		fputc(0, f); // quant-table id
-		int i;
-		for (i=0; i<64; i++)
-			fputc(luma_quantizer[scan_order[i]], f);
+	for (i=0; i<64; i++) {
+    fputc(luma_quantizer[scan_order[i]], f);
+    jpg[size+i] = luma_quantizer[scan_order[i]];
+  }
+  size += i;
 
-	fputc(0xFF, f); fputc(0xDB, f); // DQT Symbol
-		fputc(0, f); fputc(67, f); // len
-		fputc(1, f); // quant-table id
-		for (i=0; i<64; i++)
-			fputc(chroma_quantizer[scan_order[i]], f);
+	// fputc(0xFF, f); fputc(0xDB, f);               // DQT Symbol
+	// fputc(0, f); fputc(67, f);                    // len
+	// fputc(1, f);                                  // quant-table id
+  dqt_sym[4] += 1; // increases the quantization table id from 0 to 1
+	for (i=0; i<5; i++) {
+    fputc(dqt_sym[i], f);
+    jpg[size+i] = dqt_sym[i];
+  }
+  size += i;
+  dqt_sym[4] -= 1; // to make it ready for another encription
 
-	write_dht_header(f, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00);
-	write_dht_header(f, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10);
-	write_dht_header(f, Chroma[0].code_len_freq, Chroma[0].sym_sorted, 0x01);
-	write_dht_header(f, Chroma[1].code_len_freq, Chroma[1].sym_sorted, 0x11);
+	for (i=0; i<64; i++) {
+    fputc(chroma_quantizer[scan_order[i]], f);
+    jpg[size+i] = chroma_quantizer[scan_order[i]];
+  }
+  size += i;
 
-	fputc(0xFF, f); fputc(0xC0, f); // SOF0 Symbol (Baseline DCT)
-		fputc(0, f); fputc(17, f); // len
-		fputc(0x08, f); // data precision - 8bit
-		fputc(((dims.h)>>8)&0xFF, f); fputc((dims.h)&0xFF, f); // picture height
-		fputc(((dims.w)>>8)&0xFF, f); fputc((dims.w)&0xFF, f); // picture width
-		fputc(0x03, f); // num components - 3 for y, cb and cr
-		fputc(1, f); // #1 id
-		fputc(0x22, f); // sampling factor (bit0-3=vertical, bit4-7=horiz)
-		fputc(0, f); // quantization table index
-		fputc(2, f); // #2 id
-		fputc(0x11, f); // sampling factor (bit0-3=vertical, bit4-7=horiz)
-		fputc(1, f); // quantization table index
-		fputc(3, f); // #3 id
-		fputc(0x11, f); // sampling factor (bit0-3=vertical, bit4-7=horiz)
-		fputc(1, f); // quantization table index
+	size += write_dht_header(f, jpg, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00, size);
+	size += write_dht_header(f, jpg, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10, size);
+	size += write_dht_header(f, jpg, Chroma[0].code_len_freq, Chroma[0].sym_sorted, 0x01, size);
+	size += write_dht_header(f, jpg, Chroma[1].code_len_freq, Chroma[1].sym_sorted, 0x11, size);
 
-	fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
-		fputc(0, f); fputc(8, f); // len
-		fputc(1, f); // number of components
-		fputc(1, f); // id of component
-		fputc(0x00, f); // table index, bit0-3=AC-table, bit4-7=DC-table
-		fputc(0x00, f); // start of spectral or predictor selection - not used
-		fputc(0x3F, f); // end of spectral selection - default value
-		fputc(0x00, f); // successive approximation bits - default value
-		write_coefficients(f, dims.w*dims.h, Y, &Luma[0], &Luma[1]);
-		fill_last_byte(f);
+	// fputc(0xFF, f); fputc(0xC0, f); // SOF0 Symbol (Baseline DCT)
+	// fputc(0, f); fputc(17, f); // len
+	// fputc(0x08, f); // data precision - 8bit
+	// fputc(((dims.h)>>8)&0xFF, f); fputc((dims.h)&0xFF, f); // picture height
+	// fputc(((dims.w)>>8)&0xFF, f); fputc((dims.w)&0xFF, f); // picture width
+	// fputc(0x03, f); // num components - 3 for y, cb and cr
+	// fputc(1, f); // #1 id
+	// fputc(0x22, f); // sampling factor (bit0-3=vertical, bit4-7=horiz)
+	// fputc(0, f); // quantization table index
+	// fputc(2, f); // #2 id
+	// fputc(0x11, f); // sampling factor (bit0-3=vertical, bit4-7=horiz)
+	// fputc(1, f); // quantization table index
+	// fputc(3, f); // #3 id
+	// fputc(0x11, f); // sampling factor (bit0-3=vertical, bit4-7=horiz)
+	// fputc(1, f); // quantization table index
+	for (i=0; i<5; i++) {
+    fputc(mid[i], f);
+    jpg[size+i] = mid[i];
+  }
+	fputc(((dims.h)>>8)&0xFF, f); fputc((dims.h)&0xFF, f); // picture height
+	fputc(((dims.w)>>8)&0xFF, f); fputc((dims.w)&0xFF, f); // picture width
+  jpg[(size++)+i] = ((dims.h)>>8)&0xFF;
+  jpg[(size++)+i] = (dims.h)&0xFF;
+  jpg[(size++)+i] = ((dims.w)>>8)&0xFF;
+  jpg[(size++)+i] = (dims.w)&0xFF;
+  for (; i < 15; i++) {
+    fputc(mid[i], f);
+    jpg[size+i] = mid[i];
+  }
+  size += i;
 
-	fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
-		fputc(0, f); fputc(8, f); // len
-		fputc(1, f); // number of components
-		fputc(2, f); // id of component
-		fputc(0x11, f); // table index, bit0-3=AC-table, bit4-7=DC-table
-		fputc(0x00, f); // start of spectral or predictor selection - not used
-		fputc(0x3F, f); // end of spectral selection - default value
-		fputc(0x00, f); // successive approximation bits - default value
-		write_coefficients(f, dims.w*dims.h/4, Cb, &Chroma[0], &Chroma[1]);
-		fill_last_byte(f);
+	// fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
+	// fputc(0, f); fputc(8, f); // len
+	// fputc(1, f); // number of components
+	// fputc(1, f); // id of component
+	// fputc(0x00, f); // table index, bit0-3=AC-table, bit4-7=DC-table
+	// fputc(0x00, f); // start of spectral or predictor selection - not used
+	// fputc(0x3F, f); // end of spectral selection - default value
+	// fputc(0x00, f); // successive approximation bits - default value
+	for (i = 0; i < 10; i++) {
+    fputc(coef_info[i], f);
+    jpg[size+i] = coef_info[i];
+  }
+  size += i;
+  coef_info[5]++;
+  coef_info[6] = 0x11;
+	size += write_coefficients(f, jpg, dims.w*dims.h, Y, &Luma[0], &Luma[1], size);
+	fill_last_byte(f, jpg, size);
+  size++;
 
-	fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
-		fputc(0, f); fputc(8, f); // len
-		fputc(1, f); // number of components
-		fputc(3, f); // id of component
-		fputc(0x11, f); // table index, bit0-3=AC-table, bit4-7=DC-table
-		fputc(0x00, f); // start of spectral or predictor selection - not used
-		fputc(0x3F, f); // end of spectral selection - default value
-		fputc(0x00, f); // successive approximation bits - default value
-		write_coefficients(f, dims.w*dims.h/4, Cr, &Chroma[0], &Chroma[1]);
-		fill_last_byte(f);
+	// fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
+	// fputc(0, f); fputc(8, f); // len
+	// fputc(1, f); // number of components
+	// fputc(2, f); // id of component
+	// fputc(0x11, f); // table index, bit0-3=AC-table, bit4-7=DC-table
+	// fputc(0x00, f); // start of spectral or predictor selection - not used
+	// fputc(0x3F, f); // end of spectral selection - default value
+	// fputc(0x00, f); // successive approximation bits - default value
 
-	fputc(0xFF, f); fputc(0xD9, f); // EOI Symbol
+	for (i = 0; i < 10; i++) {
+    fputc(coef_info[i], f);
+    jpg[size+i] = coef_info[i];
+  }
+  size += i;
+  coef_info[5]++;
+	size += write_coefficients(f, jpg, dims.w*dims.h/4, Cb, &Chroma[0], &Chroma[1], size);
+	fill_last_byte(f, jpg, size);
+  size++;
+
+	// fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
+	// fputc(0, f); fputc(8, f); // len
+	// fputc(1, f); // number of components
+	// fputc(3, f); // id of component
+	// fputc(0x11, f); // table index, bit0-3=AC-table, bit4-7=DC-table
+	// fputc(0x00, f); // start of spectral or predictor selection - not used
+	// fputc(0x3F, f); // end of spectral selection - default value
+	// fputc(0x00, f); // successive approximation bits - default value
+
+	for (i = 0; i < 10; i++) {
+    fputc(coef_info[i], f);
+    jpg[size+i] = coef_info[i];
+  }
+  size += i;
+  coef_info[5] = 0x01;                                             
+  coef_info[6] = 0x00;                                             
+	size += write_coefficients(f, jpg, dims.w*dims.h/4, Cr, &Chroma[0], &Chroma[1], size);
+	fill_last_byte(f, jpg, size);
+  size++;
+
+	// fputc(0xFF, f); fputc(0xD9, f); // EOI Symbol
+  for (i = 0; i < 2; i++) {
+    fputc(eoi[i], f);
+    jpg[size+i] = eoi[i];
+  }
+  size += i;
 
 	fclose(f);
-  return 0;
+  return size;
 }
 /* int writePpm(FILE * f, uint8_t *sub)
  *  writes the subsampled rgb array (sub) into a .ppm file (f) of the original dimensions

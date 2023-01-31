@@ -15,6 +15,7 @@
 #include "include/define.h"
 #include "include/brain.h"
 #include "include/encoder.h"
+#include "include/structs.h"
 
 uint8_t raw[3*PIX_LEN];
 uint8_t sub[3*PIX_LEN/16];
@@ -39,6 +40,8 @@ huff_code Luma[2];
 huff_code Chroma[2];
 int len = 0;
 uint8_t different = 0;
+
+area_t fullImage = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
 
 uint8_t stored = 0;
 int qid;
@@ -165,7 +168,7 @@ int main(int argc, char ** argv) {
           printf("post dct\n");
 	        init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
           printf("post huffman\n");
-          size_t size = write_file(newname, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
+          size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
           printf("size = %zu\n", size);
 	        // size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
           // FILE * out = fopen(newname, "w");
@@ -182,16 +185,11 @@ int main(int argc, char ** argv) {
         }
       } else {
         printf("\033[0;036mImages are the same\033[0m\n");
-        area_t fullImage;
-        fullImage.x = 0;
-        fullImage.y = 0;
-        fullImage.w = WIDTH;
-        fullImage.h = HEIGHT;
         getName(text, newname, -1);
         rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
         init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-        size_t size = write_file(newname, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-        printf("size = %zu\n", size);
+        size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
+        // printf("size = %zu\n", size);
       }
     } else {
       printf("\033[0;036mNo image stored\nStoring and encoding\033[0m\n");
@@ -202,11 +200,6 @@ int main(int argc, char ** argv) {
       secelapsed = (store_t.tv_sec - sub_t.tv_sec);
       printf("storing time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
       getSavedName(text, savedName);
-      area_t fullImage;
-      fullImage.x = 0;
-      fullImage.y = 0;
-      fullImage.w = WIDTH;
-      fullImage.h = HEIGHT;
       // jpg = (uint8_t*)malloc(3*fullImage.h*fullImage.w);
       // ordered_dct_Y = (int16_t*)malloc(fullImage.h*fullImage.w);
       // ordered_dct_Cb = (int16_t*)malloc(fullImage.h*fullImage.w/4);
@@ -231,11 +224,12 @@ int main(int argc, char ** argv) {
       printf("Ciao Bello 2\n");
 	    // size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       printf("name: %s\n",newname);
-      size_t size = write_file(newname, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
+      size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       printf("size = %zu\n", size);
-      // FILE * out = fopen(newname, "w+");
-      // for (i = 0; i < size; i++) fputc(jpg[i], out);
-      // fclose(out);
+      printf("jpg[%zu] = %i, jpg[%lu] = %i\n", size, jpg[size], size-1, jpg[size-1]);
+      FILE * out = fopen("images/competitor.jpg", "w+");
+      for (i = 0; i < size; i++) fputc(jpg[i], out);
+      fclose(out);
       gettimeofday(&op_t, NULL);
       millielapsed = (op_t.tv_usec - store_t.tv_usec)/1000;
       secelapsed = (op_t.tv_sec - store_t.tv_sec);
