@@ -150,62 +150,45 @@ int main(int argc, char ** argv) {
       millielapsed = (comp_t.tv_usec - sub_t.tv_usec)/1000;
       secelapsed = (comp_t.tv_sec - sub_t.tv_sec);
       printf("comparison time:                      %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
-    //   if (different) {
-    //     printf("\033[0;036mImages are different\033[0m\n");
-    //     gettimeofday(&store_t, NULL);
-    //     millielapsed = (store_t.tv_usec - comp_t.tv_usec)/1000;
-    //     secelapsed = (store_t.tv_sec - comp_t.tv_sec);
-    //     printf("storing time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
-    //     for (int i = 0; i < different; i++) {
-    //       jpg = (uint8_t*)malloc(3*diffDims[i].h*diffDims[i].w);
-    //       ordered_dct_Y = (int16_t*)malloc(diffDims[i].h*diffDims[i].w);
-    //       ordered_dct_Cb = (int16_t*)malloc(diffDims[i].h*diffDims[i].w/4);
-    //       ordered_dct_Cr = (int16_t*)malloc(diffDims[i].h*diffDims[i].w/4);
-    //       gettimeofday(&appo, NULL);
-    //       printf("pre getName\n");
-    //       getName(text, newname, i);
-    //       enlargeAdjust(&diffDims[i]);
-    //       int last[3] = {0, 0, 0};
-    //       offx = 0;
-    //       offy = 0;
-    //       for (i = 0; i < (diffDims[i].w/16)*(diffDims[i].h/16); i++) {
-    //         rgb_to_dct_block(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, (offy+diffDims[i].y)*WIDTH+(offx+diffDims[i].x));
-    //         for (j = 0; j < 4; j++) {
-    //         ordered_dct_Y[((offy+(j%2))*diffDims[i].w)*8 + (offx+(j/2))*8] += last[0];
-    //         last[0] += ordered_dct_Y[((offy+(j%2))*diffDims[i].w)*8 + (offx+(j/2))*8];
-    //         }
-    //         ordered_dct_Cb[(offy/2)*diffDims[i].w+offx/2] -= last[1]; 
-    //         last[1] += ordered_dct_Cb[(offy/2)*diffDims[i].w+offx/2]; 
-    //         ordered_dct_Cr[(offy/2)*diffDims[i].w+offx/2] -= last[2]; 
-    //         last[2] += ordered_dct_Cr[(offy/2)*diffDims[i].w+offx/2]; 
-    //         if(i%(diffDims[i].w/16) == (diffDims[i].w/16)-1) {
-    //           offx += 16;
-    //           offy = diffDims[i].y;
-    //         } else offy += 16;
-    //       }
-    //       printf("post dct\n");
-	   //      init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-    //       printf("post huffman\n");
-	   //      size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-    //       FILE * out = fopen(newname, "w");
-    //       for (i = 0; i < size; i++) {
-    //         fputc(jpg[i], out);
-    //       }
-    //       fclose(out);
-    //       free(ordered_dct_Y);
-    //       free(ordered_dct_Cb);
-    //       free(ordered_dct_Cr);
-    //       free(jpg);
-    //       gettimeofday(&op_t, NULL);
-    //       millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
-    //       secelapsed = (op_t.tv_sec - appo.tv_sec);
-    //       printf("\033[1Aconversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
-    //       free(ordered_dct_Y);
-    //       free(ordered_dct_Cb);
-    //       free(ordered_dct_Cr);
-    //       free(raw);
-    //     }
-    //   } else printf("\033[0;036mImages are the same\033[0m\n");
+      if (different) {
+        printf("\033[0;036mImages are different\033[0m\n");
+        gettimeofday(&store_t, NULL);
+        millielapsed = (store_t.tv_usec - comp_t.tv_usec)/1000;
+        secelapsed = (store_t.tv_sec - comp_t.tv_sec);
+        printf("storing time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+        for (int i = 0; i < different; i++) {
+          // jpg = (uint8_t*)malloc(3*diffDims[i].h*diffDims[i].w);
+          // ordered_dct_Y = (int16_t*)malloc(diffDims[i].h*diffDims[i].w);
+          // ordered_dct_Cb = (int16_t*)malloc(diffDims[i].h*diffDims[i].w/4);
+          // ordered_dct_Cr = (int16_t*)malloc(diffDims[i].h*diffDims[i].w/4);
+          gettimeofday(&appo, NULL);
+          printf("pre getName\n");
+          getName(text, newname, i);
+          enlargeAdjust(&diffDims[i]);
+          rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i]);
+          printf("post dct\n");
+	        init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
+          printf("post huffman\n");
+	        size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
+          FILE * out = fopen(newname, "w");
+          for (i = 0; i < size; i++) {
+            fputc(jpg[i], out);
+          }
+          fclose(out);
+          // free(ordered_dct_Y);
+          // free(ordered_dct_Cb);
+          // free(ordered_dct_Cr);
+          // free(jpg);
+          gettimeofday(&op_t, NULL);
+          millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
+          secelapsed = (op_t.tv_sec - appo.tv_sec);
+          printf("\033[1Aconversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+          // free(ordered_dct_Y);
+          // free(ordered_dct_Cb);
+          // free(ordered_dct_Cr);
+          // free(raw);
+        }
+      } else printf("\033[0;036mImages are the same\033[0m\n");
     } else {
       printf("\033[0;036mNo image stored\nStoring and encoding\033[0m\n");
       stored = 1;
@@ -226,27 +209,7 @@ int main(int argc, char ** argv) {
       // ordered_dct_Cb = (int16_t*)malloc(fullImage.h*fullImage.w/4);
       // ordered_dct_Cr = (int16_t*)malloc(fullImage.h*fullImage.w/4);
       getName(text, newname, -1);
-      int last[3] = {0, 0, 0};
-      offx = 0;
-      offy = 0;
-      for (i = 0; i < fullImage.w*fullImage.h/256; i++) {
-        offx = i%(fullImage.w/16);
-        offy = i/(fullImage.w/16);
-        rgb_to_dct_block_old(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr,offx, offy, fullImage.w);
-      }
-      for (i = 0; i < fullImage.w*fullImage.h/64; i++) {
-        if(i >= fullImage.w && i < fullImage.w*16+256) printf("pre: %i - ", ordered_dct_Y[i*64]);
-        ordered_dct_Y[i*64] -= last[0];
-        if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", ordered_dct_Y[i*64]);
-        last[0] += ordered_dct_Y[i*64];
-        if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
-        if(i < fullImage.w*fullImage.h/256){
-          ordered_dct_Cb[i*64] -= last[1]; 
-          last[1] += ordered_dct_Cb[i*64]; 
-          ordered_dct_Cr[i*64] -= last[2]; 
-          last[2] += ordered_dct_Cr[i*64]; 
-        }
-      }
+      rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
       FILE * Y = fopen("dct_Y", "w");
       FILE * Cb = fopen("dct_Cb", "w");
       FILE * Cr = fopen("dct_Cr", "w");
@@ -266,11 +229,7 @@ int main(int argc, char ** argv) {
 	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       printf("name: %s\n",newname);
       printf("size = %zu\n\n\n\n\n\n\n\n\n\n\n", size);
-      // int fd = open(newname, O_RDWR | O_CREAT);
-      // printf("fd: %d\n",fd);
       FILE * out = fopen(newname, "w+");
-      // size--;
-      // printf("size = %zu, write-size = %zi\n\n",size, write(fd, jpg, size));
       for (i = 0; i < size; i++) {
         printf("\033[10Ajpg[%i] = %s%i\n", i-9, jpg[i-8] < 100 ? (jpg[i-8] < 10 ? "  " : " "): "", jpg[i-9]);
         printf("jpg[%i] = %s%i\n", i-8, jpg[i-8] < 100 ? (jpg[i-8] < 10 ? "  " : " "): "", jpg[i-8]);
@@ -282,7 +241,6 @@ int main(int argc, char ** argv) {
         printf("jpg[%i] = %s%i\n", i-2, jpg[i-2] < 100 ? (jpg[i-2] < 10 ? "  " : " "): "", jpg[i-2]);
         printf("jpg[%i] = %s%i\n", i-1, jpg[i-1] < 100 ? (jpg[i-1] < 10 ? "  " : " "): "", jpg[i-1]);
         printf("jpg[%i] = %s%i\n", i, jpg[i] < 100 ? (jpg[i] < 10 ? "  " : " "): "", jpg[i]);
-        // fprintf(out,"\033[1Ajpg[%i] = %i\n", i, jpg[i]);
         fputc(jpg[i], out);
       }
       // close(fd);
