@@ -211,6 +211,30 @@ void rgb_to_dct_block_old(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int 
   dct_block(8, midCbCr[0], Cb + offCbCr, chroma_quantizer);
   dct_block(8, midCbCr[1], Cr + offCbCr, chroma_quantizer);
 }
+void rgb_to_dct_new(uint8_t in[3*PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
+  int i = 0;
+  int offx = 0;
+  int offy = 0;
+	int last[3] = {0, 0, 0};
+  for (i = 0; i < dims.w*dims.h/256; i++) {
+    offx = i%(dims.w/16);
+    offy = i/(dims.w/16);
+    rgb_to_dct_block_old(in, out[0], out[1], out[2],offx, offy, dims);
+  }
+  for (i = 0; i < dims.w*dims.h/64; i++) {
+    // if(i >= dims.w && i < dims.w*16+256) printf("pre: %i - ", out[0][i*64]);
+    out[0][i*64] -= last[0];
+    // if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", out[0][i*64]);
+    last[0] += out[0][i*64];
+    // if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
+    if(i < dims.w*dims.h/256){
+      out[1][i*64] -= last[1]; 
+      last[1] += out[1][i*64]; 
+      out[2][i*64] -= last[2]; 
+      last[2] += out[2][i*64]; 
+    }
+  }
+}
 
 void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
   int i = 0;
@@ -745,28 +769,7 @@ void encodeNsend_blocks(char * name, uint8_t raw[3*PIX_LEN], area_t dims) {
   int16_t ordered_dct[3][PIX_LEN];
   huff_code Luma[2];
   huff_code Chroma[2];
-	int last[3] = {0, 0, 0};
-  int i = 0;
-  int offx = 0;
-  int offy = 0;
-  for (i = 0; i < dims.w*dims.h/256; i++) {
-    offx = i%(dims.w/16);
-    offy = i/(dims.w/16);
-    rgb_to_dct_block_old(raw, ordered_dct[0], ordered_dct[1], ordered_dct[2],offx, offy, dims);
-  }
-  for (i = 0; i < dims.w*dims.h/64; i++) {
-    // if(i >= dims.w && i < dims.w*16+256) printf("pre: %i - ", ordered_dct[0][i*64]);
-    ordered_dct[0][i*64] -= last[0];
-    // if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", ordered_dct_Y[i*64]);
-    last[0] += ordered_dct[0][i*64];
-    // if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
-    if(i < dims.w*dims.h/256){
-      ordered_dct[1][i*64] -= last[1]; 
-      last[1] += ordered_dct[1][i*64]; 
-      ordered_dct[2][i*64] -= last[2]; 
-      last[2] += ordered_dct[2][i*64]; 
-    }
-  }
+  rgb_to_dct_new(raw, ordered_dct, dims);
   init_huffman(ordered_dct, dims, Luma, Chroma);
 	write_file(name, ordered_dct, dims, Luma, Chroma);
 }

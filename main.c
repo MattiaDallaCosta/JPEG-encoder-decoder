@@ -117,7 +117,7 @@ int main(int argc, char ** argv) {
           getName(text, newname, i);
           // sprintf(newname, "out-%i.jpg", i);
           enlargeAdjust(&diffDims[i]);
-          encodeNsend(newname, raw, diffDims[i]);
+          encodeNsend_blocks(newname, rawA, diffDims[i]);
           gettimeofday(&op_t, NULL);
           millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
           secelapsed = (op_t.tv_sec - appo.tv_sec);
