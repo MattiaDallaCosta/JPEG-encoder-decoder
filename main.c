@@ -35,7 +35,7 @@ int16_t ordered_dct_Cr[PIX_LEN/4];
 
 uint8_t saved[3*PIX_LEN/16];
 area_t diffDims[20];
-pair_t differences[PIX_LEN/16];
+pair_t differences[2][WIDTH/8];
 huff_code Luma[2];
 huff_code Chroma[2];
 int len = 0;
@@ -91,13 +91,10 @@ int main(int argc, char ** argv) {
     if(strcmp(text, "saved") == 0){
       if(stored){
         printf("\033[0;032mCreating saved file\033[0m\n");
+        getSavedName(text, savedName);
         FILE * f_sub = fopen(savedName, "w");
         writePpm(f_sub, saved);
         fclose(f_sub);
-        gettimeofday(&store_t, NULL);
-        millielapsed = (store_t.tv_usec - start.tv_usec)/1000;
-        secelapsed = (store_t.tv_sec - start.tv_sec)/1000;
-        printf("storing time: %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
       } else printf("\033[0;031mNo previous image stored\033[0m\n");
       printf("\033[0;36mDone\033[0m\n");
       continue;
@@ -106,7 +103,6 @@ int main(int argc, char ** argv) {
       fprintf(stderr, "\033[0;031mUnable to open file\033[0m\n");
       continue;
     }
-    // raw = (uint8_t*)malloc(3*PIX_LEN);
 	  if (readPpm(f_in, raw)) {
       printf("\033[0;031mError reading input file\033[0m\n");
 	  	fclose(f_in);
@@ -117,7 +113,6 @@ int main(int argc, char ** argv) {
     millielapsed = (read_t.tv_usec - start.tv_usec)/1000;
     secelapsed = (read_t.tv_sec - start.tv_sec);
     printf("reading time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
-    // sub = (uint8_t*)malloc(3*PIX_LEN/16);
     subsample(raw, sub);
     gettimeofday(&sub_t, NULL);
     millielapsed = (sub_t.tv_usec - read_t.tv_usec)/1000;
@@ -131,30 +126,14 @@ int main(int argc, char ** argv) {
         diffDims[i].w = -1;
         diffDims[i].h = -1;
       }
-      // for (i = 0; i < PIX_LEN/256; i++) {
-      //   // printf("loop %i, offx = %i, offy = %i\n", i, offx, offy);
-      //   different = compare_block(sub, saved, diffDims, differences, different, offx, offy);
-      //   if ((i%(WIDTH/16) == (WIDTH/16)-1)) {
-      //     offx = 0;
-      //     offy += 4;
-      //   } else offx += 4;
-      // }
       different = compare(sub, saved, diffDims, differences);
       printf("different = %i\n", different);
-      // for (int i = 0; i < different; i++) {
-      //   enlargeAdjust(diffDims+i);
-      //   printf("diffDims[%i]: x = %i y = %i w = %i h = %i\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-      // }
       gettimeofday(&comp_t, NULL);
       millielapsed = (comp_t.tv_usec - sub_t.tv_usec)/1000;
       secelapsed = (comp_t.tv_sec - sub_t.tv_sec);
       printf("comparison time:                      %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
       if (different) {
         printf("\033[0;036mImages are different\033[0m\n");
-        gettimeofday(&store_t, NULL);
-        millielapsed = (store_t.tv_usec - comp_t.tv_usec)/1000;
-        secelapsed = (store_t.tv_sec - comp_t.tv_sec);
-        printf("storing time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
         for (int i = 0; i < different; i++) {
           // jpg = (uint8_t*)malloc(3*diffDims[i].h*diffDims[i].w);
           // ordered_dct_Y = (int16_t*)malloc(diffDims[i].h*diffDims[i].w);
@@ -163,17 +142,15 @@ int main(int argc, char ** argv) {
           gettimeofday(&appo, NULL);
           printf("pre getName\n");
           getName(text, newname, i);
+          printf("\033[1A");
           enlargeAdjust(&diffDims[i]);
           rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i]);
-          printf("post dct\n");
 	        init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-          printf("post huffman\n");
           size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
           printf("size = %zu\n", size);
-	        // size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-          // FILE * out = fopen(newname, "w");
-          // for (i = 0; i < size; i++) fputc(jpg[i], out);
-          // fclose(out);
+          FILE * out = fopen(newname, "w+");
+          for (int i = 0; i < size; i++) fputc(jpg[i], out);
+          fclose(out);
           gettimeofday(&op_t, NULL);
           millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
           secelapsed = (op_t.tv_sec - appo.tv_sec);
@@ -189,61 +166,48 @@ int main(int argc, char ** argv) {
         rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
         init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
         size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-        // printf("size = %zu\n", size);
+        printf("size = %zu\n", size);
+        FILE * out = fopen(newname, "w+");
+        for (i = 0; i < size; i++) fputc(jpg[i], out);
+        fclose(out);
       }
     } else {
       printf("\033[0;036mNo image stored\nStoring and encoding\033[0m\n");
       stored = 1;
-      // free(sub);
-      gettimeofday(&store_t, NULL);
-      millielapsed = (store_t.tv_usec - sub_t.tv_usec)/1000;
-      secelapsed = (store_t.tv_sec - sub_t.tv_sec);
-      printf("storing time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
-      getSavedName(text, savedName);
       // jpg = (uint8_t*)malloc(3*fullImage.h*fullImage.w);
       // ordered_dct_Y = (int16_t*)malloc(fullImage.h*fullImage.w);
       // ordered_dct_Cb = (int16_t*)malloc(fullImage.h*fullImage.w/4);
       // ordered_dct_Cr = (int16_t*)malloc(fullImage.h*fullImage.w/4);
+      printf("pre getName\n");
       getName(text, newname, -1);
+      printf("\033[1A");
       rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
-      // FILE * Y = fopen("dct_Y", "w");
-      // FILE * Cb = fopen("dct_Cb", "w");
-      // FILE * Cr = fopen("dct_Cr", "w");
-      // for (int i = 0; i < 256; i++) {
-      //   if (i < fullImage.w*fullImage.h/16) {
-      //     fprintf(Cb, "%i ", ordered_dct_Cb[i]);
-      //     fprintf(Cr, "%i ", ordered_dct_Cr[i]);
-      //   }
-      //   fprintf(Y, "%i ", ordered_dct_Y[i]);
-      // }
-      // fclose(Y);
-      // fclose(Cb);
-      // fclose(Cr);
-      printf("Ciao Bello 1\n");
       init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-      printf("Ciao Bello 2\n");
 	    // size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-      printf("name: %s\n",newname);
       size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       printf("size = %zu\n", size);
-      printf("jpg[%zu] = %i, jpg[%lu] = %i\n", size, jpg[size], size-1, jpg[size-1]);
-      FILE * out = fopen("images/competitor.jpg", "w+");
+      printf("jpg[%zu] = %i, jpg[%lu] = %i\n", size-2, jpg[size-2], size-1, jpg[size-1]);
+      FILE * out = fopen(newname, "w+");
       for (i = 0; i < size; i++) fputc(jpg[i], out);
       fclose(out);
       gettimeofday(&op_t, NULL);
-      millielapsed = (op_t.tv_usec - store_t.tv_usec)/1000;
-      secelapsed = (op_t.tv_sec - store_t.tv_sec);
+      millielapsed = (op_t.tv_usec - sub_t.tv_usec)/1000;
+      secelapsed = (op_t.tv_sec - sub_t.tv_sec);
       printf("conversion time for full image:       %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
       // free(ordered_dct_Y);
       // free(ordered_dct_Cb);
       // free(ordered_dct_Cr);
     }
+    store(sub, saved);
+    gettimeofday(&store_t, NULL);
+    millielapsed = (store_t.tv_usec - op_t.tv_usec)/1000;
+    secelapsed = (store_t.tv_sec - op_t.tv_sec);
+    printf("storing time:                         %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
     gettimeofday(&end, NULL);
     millielapsed = (end.tv_usec - start.tv_usec)/1000;
     secelapsed = (end.tv_sec - start.tv_sec);
     printf("comparison and conversion total time: %li:%li:%li.%s%li\n",(secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
     printf("\033[0;36mDone\033[0m\n");
-    store(sub, saved);
     // free(raw);
     // sleep(1);
   }
