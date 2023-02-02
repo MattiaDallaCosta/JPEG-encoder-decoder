@@ -127,7 +127,7 @@ int main(int argc, char ** argv) {
         diffDims[i].h = -1;
       }
       different = compare(sub, saved, diffDims, differences);
-      printf("different = %i\n", different);
+      // printf("different = %i\n", different);
       gettimeofday(&comp_t, NULL);
       millielapsed = (comp_t.tv_usec - sub_t.tv_usec)/1000;
       secelapsed = (comp_t.tv_sec - sub_t.tv_sec);
@@ -147,14 +147,14 @@ int main(int argc, char ** argv) {
           rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i]);
 	        init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
           size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-          printf("size = %zu\n", size);
+          // printf("size = %zu\n", size);
           FILE * out = fopen(newname, "w+");
           for (int i = 0; i < size; i++) fputc(jpg[i], out);
           fclose(out);
           gettimeofday(&op_t, NULL);
           millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
           secelapsed = (op_t.tv_sec - appo.tv_sec);
-          printf("\033[1Aconversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+          printf("conversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
           // free(ordered_dct_Y);
           // free(ordered_dct_Cb);
           // free(ordered_dct_Cr);
@@ -166,7 +166,7 @@ int main(int argc, char ** argv) {
         rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
         init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
         size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-        printf("size = %zu\n", size);
+        // printf("size = %zu\n", size);
         FILE * out = fopen(newname, "w+");
         for (i = 0; i < size; i++) fputc(jpg[i], out);
         fclose(out);
@@ -183,10 +183,9 @@ int main(int argc, char ** argv) {
       printf("\033[1A");
       rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
       init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-	    // size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-      printf("size = %zu\n", size);
-      printf("jpg[%zu] = %i, jpg[%lu] = %i\n", size-2, jpg[size-2], size-1, jpg[size-1]);
+      // printf("size = %zu\n", size);
+      // printf("jpg[%zu] = %i, jpg[%lu] = %i\n", size-2, jpg[size-2], size-1, jpg[size-1]);
       FILE * out = fopen(newname, "w+");
       for (i = 0; i < size; i++) fputc(jpg[i], out);
       fclose(out);

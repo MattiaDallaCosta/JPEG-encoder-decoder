@@ -72,7 +72,7 @@ void sumAreas(area_t * a1, area_t a2) {
 }
 
 uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t differences[2][WIDTH/8]) {
-  printf("in compare\n");
+  // printf("in compare\n");
   int isDifferent = 0;
   int index = 0;
   int outsIndex = 0;
