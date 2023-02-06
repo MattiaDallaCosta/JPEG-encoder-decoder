@@ -9,6 +9,8 @@
 // Include FreeRTOS for delay
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include "esp_timer.h"
+#include "esp_sleep.h"
 #include "esp_camera.h"
 #include "img_converters.h"
 
@@ -20,29 +22,34 @@
 
 static const char *TAG = "image comparator";
 
+static esp_err_t init_camera();
+static void photo_callback(void* arg);
+
 // uint8_t *raw;
 // uint8_t *sub;
-// uint8_t *jpg;
 
 uint8_t EXT_RAM_BSS_ATTR raw[3*PIX_LEN];
 uint8_t EXT_RAM_BSS_ATTR sub[3*PIX_LEN/16];
-uint8_t EXT_RAM_BSS_ATTR jpg[3*PIX_LEN];
 
 // int16_t *ordered_dct_Y;
 // int16_t *ordered_dct_Cb;
 // int16_t *ordered_dct_Cr;
+// uint8_t *jpg;
 
 int16_t EXT_RAM_BSS_ATTR ordered_dct_Y[PIX_LEN];
 int16_t EXT_RAM_BSS_ATTR ordered_dct_Cb[PIX_LEN/4];
 int16_t EXT_RAM_BSS_ATTR ordered_dct_Cr[PIX_LEN/4];
+uint8_t EXT_RAM_BSS_ATTR jpg[3*PIX_LEN];
 
 uint8_t EXT_RAM_BSS_ATTR saved[3*PIX_LEN/16];
 area_t EXT_RAM_BSS_ATTR diffDims[20];
-pair_t EXT_RAM_BSS_ATTR differences[PIX_LEN/32];
+pair_t EXT_RAM_BSS_ATTR differences[2][WIDTH/8];
 huff_code EXT_RAM_BSS_ATTR Luma[2];
 huff_code EXT_RAM_BSS_ATTR Chroma[2];
-int len = 0;
 uint8_t different = 0;
+int timer_val = 1000000;
+area_t fullImage = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
+camera_fb_t* fb;
 
 static camera_config_t camera_config = {
   .pin_pwdn = PWDN_GPIO_NUM,
@@ -66,11 +73,95 @@ static camera_config_t camera_config = {
   .ledc_channel = LEDC_CHANNEL_0,
   .pixel_format = PIXFORMAT_JPEG,  //YUV422,GRAYSCALE,RGB565,JPEG
   .frame_size = FRAMESIZE_QVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
-  .jpeg_quality = 12,              //0-63 lower number means higher quality
+  .jpeg_quality = 7,              //0-63 lower number means higher quality
   .fb_count = 1,                   //if more than one, i2s runs in continuous mode. Use only with JPEG
   .grab_mode = CAMERA_GRAB_LATEST,
   .fb_location = CAMERA_FB_IN_PSRAM
 };
+
+int app_main() {
+  int i;
+  // Use settings defined above to initialize and mount SPIFFS filesystem.
+  // Note: esp_vfs_spiffs_register is an all-in-one convenience function.
+  init_camera();
+  fb = esp_camera_fb_get();
+  // esp_camera_fb_return(fb);
+  // fb = esp_camera_fb_get();
+  ESP_LOGI(TAG, "taken photo");
+  ESP_LOGI(TAG, "image size: %zu, %zux%zu", fb->len, fb->width, fb->height);
+  fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+  esp_camera_fb_return(fb);
+  ESP_LOGI(TAG, "post jpg to rgb");
+  subsample(raw, sub);
+  store(sub, saved);
+  ESP_LOGI(TAG, "post store");
+  const esp_timer_create_args_t timer_args = {
+          .callback = &photo_callback,
+          /* name is optional, but may help identify the timer when debugging */
+          .name = "periodic"
+  };
+  esp_timer_handle_t timer;
+  ESP_ERROR_CHECK(esp_timer_create(&timer_args, &timer));
+  ESP_ERROR_CHECK(esp_timer_start_periodic(timer, timer_val));
+  ESP_LOGI(TAG, "--- finished initialization ---");
+  // Main loop
+  while(true) {
+    for (i = 0; i < 20; i++) {
+      diffDims[i].x = -1;
+      diffDims[i].y = -1;
+      diffDims[i].w = -1;
+      diffDims[i].h = -1;
+    }
+    for (i = 0; i < WIDTH/8; i++) {
+      differences[1][i].beg = differences[0][i].beg = -1;
+      differences[1][i].end = differences[0][i].end = -1;
+      differences[1][i].row = differences[0][i].row = -1;
+      differences[1][i].done = differences[0][i].done = -1;
+    }
+    different = 0;
+    fb = esp_camera_fb_get();
+    esp_camera_fb_return(fb);
+    fb = esp_camera_fb_get();
+    ESP_LOGI(TAG, "image capture"); 
+    ESP_LOGI(TAG, "pre decoding");
+    fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+    ESP_LOGI(TAG, "post decoding");
+    esp_camera_fb_return(fb);
+    ESP_LOGI(TAG, "pre sub");
+    subsample(raw,sub);
+    ESP_LOGI(TAG, "post sub");
+    different = compare(sub, saved, diffDims, differences);
+    ESP_LOGI(TAG, "post compare: different = %i", different);
+    if (different) {
+      for (int i = 0; i < different; i++) {
+        // gettimeofday(&appo, NULL);
+        ESP_LOGI(TAG, "pre [%i] {%i, %i, %i, %i}", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+        enlargeAdjust(diffDims+i);
+        ESP_LOGI(TAG, "post [%i] {%i, %i, %i, %i}", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+        rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cb, diffDims[i]);
+	      init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
+	      size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
+        // gettimeofday(&op_t, NULL);
+        // millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
+        // secelapsed = (op_t.tv_sec - appo.tv_sec);
+        // printf("conversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+      }
+    } else {
+      rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cb, fullImage);
+      ESP_LOGI(TAG, "post dct");
+	    init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
+      ESP_LOGI(TAG, "post huffman");
+	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
+      ESP_LOGI(TAG, "post encode: size = %zu", size);
+      ESP_LOGW(TAG, "last characters: %i, %i", jpg[size - 2], jpg[size - 1]);
+      ESP_LOGI(TAG, "post free");
+    }
+    store(sub, saved);
+    ESP_LOGI(TAG, "post save");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    ESP_LOGI(TAG, "--- finished cicle ---\n");
+  }
+}
 
 static esp_err_t init_camera() {
   //initialize the camera
@@ -100,134 +191,60 @@ static esp_err_t init_camera() {
   return ESP_OK;
 }
 
-int app_main() {
+static void photo_callback(void *arg) {
   int i;
-  // Use settings defined above to initialize and mount SPIFFS filesystem.
-  // Note: esp_vfs_spiffs_register is an all-in-one convenience function.
-  init_camera();
-  camera_fb_t* fb = esp_camera_fb_get();
+  for (i = 0; i < 20; i++) {
+    diffDims[i].x = -1;
+    diffDims[i].y = -1;
+    diffDims[i].w = -1;
+    diffDims[i].h = -1;
+  }
+  for (i = 0; i < WIDTH/8; i++) {
+    differences[1][i].beg = differences[0][i].beg = -1;
+    differences[1][i].end = differences[0][i].end = -1;
+    differences[1][i].row = differences[0][i].row = -1;
+    differences[1][i].done = differences[0][i].done = -1;
+  }
+  different = 0;
+  fb = esp_camera_fb_get();
   esp_camera_fb_return(fb);
   fb = esp_camera_fb_get();
-  ESP_LOGI(TAG, "taken photo");
-  ESP_LOGI(TAG, "image size: %zu, %zux%zu", fb->len, fb->width, fb->height);
-  // raw = (uint8_t*)heap_caps_malloc(3*PIX_LEN, MALLOC_CAP_SPIRAM);
+  ESP_LOGI(TAG, "image capture"); 
+  ESP_LOGI(TAG, "pre decoding");
   fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
+  ESP_LOGI(TAG, "post decoding");
   esp_camera_fb_return(fb);
-  ESP_LOGI(TAG, "post jpg to rgb");
-  // sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
-  subsample(raw, sub);
-  store(sub, saved);
-  // store_file(sub, "/spiffs/saved");
-  ESP_LOGI(TAG, "post store");
-  // free(raw);
-  // free(sub);
-  ESP_LOGI(TAG, "--- finished initialization ---");
-  // Main loop
-  while(true) {
-    for (i = 0; i < 20; i++) {
-      diffDims[i].x = -1;
-      diffDims[i].y = -1;
-      diffDims[i].w = -1;
-      diffDims[i].h = -1;
+  ESP_LOGI(TAG, "pre sub");
+  subsample(raw,sub);
+  ESP_LOGI(TAG, "post sub");
+  different = compare(sub, saved, diffDims, differences);
+  ESP_LOGI(TAG, "post compare: different = %i", different);
+  if (different) {
+    for (int i = 0; i < different; i++) {
+      // gettimeofday(&appo, NULL);
+      ESP_LOGI(TAG, "pre [%i] {%i, %i, %i, %i}", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+      enlargeAdjust(diffDims+i);
+      ESP_LOGI(TAG, "post [%i] {%i, %i, %i, %i}", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+      rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cb, diffDims[i]);
+	    init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
+	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
+      // gettimeofday(&op_t, NULL);
+      // millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
+      // secelapsed = (op_t.tv_sec - appo.tv_sec);
+      // printf("conversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
     }
-    for (i = 0; i < PIX_LEN/32; i++) {
-      differences[i].beg = -1;
-      differences[i].end = -1;
-      differences[i].row = -1;
-      differences[i].done = 0;
-      for (int j = 0; j < 8; j++) {
-        differences[i].diff[j] = -1;
-      }
-    }
-    fb = esp_camera_fb_get();
-    esp_camera_fb_return(fb);
-    fb = esp_camera_fb_get();
-    ESP_LOGI(TAG, "image capture"); 
-    ESP_LOGI(TAG, "pre decoding");
-    // raw = (uint8_t*)heap_caps_malloc(3*PIX_LEN, MALLOC_CAP_SPIRAM);
-    fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
-    ESP_LOGI(TAG, "post decoding");
-    esp_camera_fb_return(fb);
-    ESP_LOGI(TAG, "pre sub");
-    // sub = (uint8_t*)heap_caps_malloc(3*PIX_LEN/16, MALLOC_CAP_SPIRAM);
-    subsample(raw,sub);
-    ESP_LOGI(TAG, "post sub");
-    uint8_t offx = 0, offy = 0;
-    // for (i = 0; i < PIX_LEN/16; i++) {
-    // // ESP_LOGI(TAG, "beginning loop %i", i);
-    //   different = compare_block(sub, saved, diffDims, different, offy*(WIDTH/4)+offx);
-    //   offx += 16;
-    //   if (i%(WIDTH/4)) {
-    //     offx = 0;
-    //     offy += 16;
-    //   }
-    // // ESP_LOGI(TAG, "done loop %i : different = %i", i, different);
-    // }
-    different = compare(sub, saved, diffDims, differences);
-    // different = compare_block(sub, saved, diffDims, differences, different, offy*(WIDTH/4)+offx);
-    ESP_LOGI(TAG, "post compare: different = %i", different);
-    store(sub, saved);
-    // store_file(sub, "/spiffs/saved");
-    // free(sub);
-    ESP_LOGI(TAG, "post save");
-    area_t fullImage = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
-    // jpg = (uint8_t*)heap_caps_malloc(3*diff.h*diff.w, MALLOC_CAP_SPIRAM);
-    // ordered_dct_Y = (int16_t*)heap_caps_malloc(diff.h*diff.w, MALLOC_CAP_SPIRAM);
-    // ordered_dct_Cb = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
-    // ordered_dct_Cr = (int16_t*)heap_caps_malloc(diff.h*diff.w/4, MALLOC_CAP_SPIRAM);
-    ESP_LOGI(TAG, "post malloc");
-    int last[3] = {0, 0, 0};
-    offx = 0;
-    offy = 0;
-    for (i = 0; i < fullImage.w*fullImage.h/256; i++) {
-      offx = i%(fullImage.w/16);
-      offy = i/(fullImage.w/16);
-      rgb_to_dct_block(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr,offx, offy, fullImage.w);
-    }
-    for (i = 0; i < fullImage.w*fullImage.h/64; i++) {
-      // if(i >= fullImage.w && i < fullImage.w*16+256) printf("pre: %i - ", ordered_dct_Y[i*64]);
-      ordered_dct_Y[i*64] -= last[0];
-      // if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", ordered_dct_Y[i*64]);
-      last[0] += ordered_dct_Y[i*64];
-      // if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
-      if(i < fullImage.w*fullImage.h/256){
-        ordered_dct_Cb[i*64] -= last[1]; 
-        last[1] += ordered_dct_Cb[i*64]; 
-        ordered_dct_Cr[i*64] -= last[2]; 
-        last[2] += ordered_dct_Cr[i*64]; 
-      }
-    }
+  } else {
+    rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cb, fullImage);
     ESP_LOGI(TAG, "post dct");
 	  init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
     ESP_LOGI(TAG, "post huffman");
 	  size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
     ESP_LOGI(TAG, "post encode: size = %zu", size);
     ESP_LOGW(TAG, "last characters: %i, %i", jpg[size - 2], jpg[size - 1]);
-    // len = encodeNsend(jpg, raw, diff);
-    // free(ordered_dct_Y);
-    // free(ordered_dct_Cb);
-    // free(ordered_dct_Cr);
-    // free(raw);
-    // free(jpg);
     ESP_LOGI(TAG, "post free");
-    // if (different) {
-    //   ESP_LOGI(TAG, "Images are different");
-    //   for (int i = 0; i < different; i++) {
-    //     ESP_LOGI(TAG, "area #%i\nx: %i, y: %i, w: %i, h:%i", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-    //     enlargeAdjust(&diffDims[i]);
-    //     ESP_LOGI(TAG, "\t¦\n\tV\nx: %i, y: %i, w: %i, h:%i", diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-    //     jpg = (uint8_t*)heap_caps_malloc(3*diffDims[i].w*diffDims[i].h, MALLOC_CAP_SPIRAM);
-    //     len = encodeNsend(jpg, raw, diffDims[i]);
-    //     if (len) {
-    //       // myBot.sendPhoto(msg, jpg, len);
-    //       len = 0;
-    //     }
-    //     free(jpg);
-    //   }
-    //   ESP_LOGI(TAG, "Post encodeNsend");
-    // } else ESP_LOGI(TAG, "Images are the same");
-    // free(raw);
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
-  ESP_LOGI(TAG, "--- finished cicle ---\n");
   }
+  store(sub, saved);
+  ESP_LOGI(TAG, "post save");
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  ESP_LOGI(TAG, "--- finished cicle ---\n");
 }
