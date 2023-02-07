@@ -465,10 +465,10 @@ size_t write_byte(FILE* f, uint8_t * jpg, int code_word, int start, int end, int
 		code_word >>= (-end);
 		code_word &= (1<<start)-1;
 		byte_buffer |= code_word;
-		// fputc(byte_buffer, f);
+		fputc(byte_buffer, f);
     jpg[initial+(size++)] = byte_buffer;
 		if (byte_buffer == 0xFF) {
-			// fputc(0, f); // stuffing bit
+			fputc(0, f); // stuffing bit
       jpg[initial+(size++)] = 0;
     }
 		bits_written = 0;
@@ -490,7 +490,7 @@ size_t write_bits(FILE* f, uint8_t * jpg, int code_word, int code_len, int start
 void fill_last_byte(FILE* f, uint8_t * jpg, int index)
 {
 	byte_buffer |= (1<<(8-bits_written))-1;
-	// fputc(byte_buffer, f);
+	fputc(byte_buffer, f);
   jpg[index] = byte_buffer;
 	byte_buffer = 0;
 	bits_written = 0;
@@ -572,27 +572,29 @@ size_t write_dht_header(FILE* f, uint8_t * jpg, int code_len_freq[], int sym_sor
 	int length = 19;
 	int i;
 	for (i=1; i<=16; i++) length += code_len_freq[i];
+  // printf("len = %i\n", length);
 
-	// fputc(0xFF, f); fputc(0xC4, f); // DHT Symbol
+	fputc(0xFF, f); fputc(0xC4, f); // DHT Symbol
   jpg[start+(size++)] = 0xFF;
   jpg[start+(size++)] = 0xC4;
 
-	// fputc( (length>>8)&0xFF , f); fputc( length&0xFF, f); // len
+	fputc( (length>>8)&0xFF , f); fputc( length&0xFF, f); // len
   jpg[start+(size++)] = (length>>8)&0xFF;
   jpg[start+(size++)] = length&0xFF;
 
-	// fputc(tc_th, f); // table class (0=DC, 1=AC) and table id (0=luma, 1=chroma)
+	fputc(tc_th, f); // table class (0=DC, 1=AC) and table id (0=luma, 1=chroma)
   jpg[start+(size++)] = tc_th;
 
 	for (i=1; i<=16; i++){
-		// fputc(code_len_freq[i], f); // number of codes of length i
+		fputc(code_len_freq[i], f); // number of codes of length i
     jpg[start+(size++)] = code_len_freq[i];
   }
 
 	for (i=0; length>19; i++, length--) {
-		// fputc(sym_sorted[i], f); // huffval, needed to reconstruct the huffman code at the receiver
+		fputc(sym_sorted[i], f); // huffval, needed to reconstruct the huffman code at the receiver
     jpg[start+(size++)] = sym_sorted[i];
   }
+  // printf("i = %i\n", i);
   return size;
 }
 
@@ -664,7 +666,7 @@ int coef_info[] = { 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00 }
 int eoi[] = { 0xFF, 0xD9 };
 
 size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
-	size_t size = 0;
+	size_t appsize, oldsize, size = 0;
   int i;
 	FILE* f = fopen(file_name, "w");
 	// fputc(0xFF, f); fputc(0xD8, f);               // SOI Symbol
@@ -679,7 +681,7 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
 	// fputc(0x00, f);                               // x thumbnail
 	// fputc(0x00, f);                               // y thumbnail
 	for (i=0; i<20; i++) {
-    // fputc(head[i], f);
+    fputc(head[i], f);
     jpg[size+i] = head[i];
   }
   size += i;
@@ -688,13 +690,13 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
 	// fputc(0, f); fputc(67, f);                    // len
 	// fputc(0, f);                                  // quant-table id
 	for (i=0; i<5; i++) {
-    // fputc(dqt_sym[i], f);
+    fputc(dqt_sym[i], f);
     jpg[size+i] = dqt_sym[i];
   }
   size += i;
 
 	for (i=0; i<64; i++) {
-    // fputc(luma_quantizer[scan_order[i]], f);
+    fputc(luma_quantizer[scan_order[i]], f);
     jpg[size+i] = luma_quantizer[scan_order[i]];
   }
   size += i;
@@ -704,22 +706,31 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
 	// fputc(1, f);                                  // quant-table id
   dqt_sym[4] += 1; // increases the quantization table id from 0 to 1
 	for (i=0; i<5; i++) {
-    // fputc(dqt_sym[i], f);
+    fputc(dqt_sym[i], f);
     jpg[size+i] = dqt_sym[i];
   }
   size += i;
   dqt_sym[4] -= 1; // to make it ready for another encription
 
 	for (i=0; i<64; i++) {
-    // fputc(chroma_quantizer[scan_order[i]], f);
+    fputc(chroma_quantizer[scan_order[i]], f);
     jpg[size+i] = chroma_quantizer[scan_order[i]];
   }
   size += i;
 
+  appsize = oldsize = size;
 	size += write_dht_header(f, jpg, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00, size);
+  // printf("size of first header = %zu\n", size - appsize);
+  appsize = size;
 	size += write_dht_header(f, jpg, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10, size);
+  // printf("size of second header = %zu\n", size - appsize);
+  appsize = size;
 	size += write_dht_header(f, jpg, Chroma[0].code_len_freq, Chroma[0].sym_sorted, 0x01, size);
+  // printf("size of third header = %zu\n", size - appsize);
+  appsize = size;
 	size += write_dht_header(f, jpg, Chroma[1].code_len_freq, Chroma[1].sym_sorted, 0x11, size);
+  // printf("size of forth header = %zu\n", size - appsize);
+  // printf("size of all headers = %zu\n", size - oldsize);
 
 	// fputc(0xFF, f); fputc(0xC0, f); // SOF0 Symbol (Baseline DCT)
 	// fputc(0, f); fputc(17, f); // len
@@ -737,17 +748,17 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
 	// fputc(0x11, f); // sampling factor (bit0-3=vertical, bit4-7=horiz)
 	// fputc(1, f); // quantization table index
 	for (i=0; i<5; i++) {
-    // fputc(mid[i], f);
+    fputc(mid[i], f);
     jpg[size+i] = mid[i];
   }
-	// fputc(((dims.h)>>8)&0xFF, f); fputc((dims.h)&0xFF, f); // picture height
-	// fputc(((dims.w)>>8)&0xFF, f); fputc((dims.w)&0xFF, f); // picture width
+	fputc(((dims.h)>>8)&0xFF, f); fputc((dims.h)&0xFF, f); // picture height
+	fputc(((dims.w)>>8)&0xFF, f); fputc((dims.w)&0xFF, f); // picture width
   jpg[(size++)+i] = ((dims.h)>>8)&0xFF;
   jpg[(size++)+i] = (dims.h)&0xFF;
   jpg[(size++)+i] = ((dims.w)>>8)&0xFF;
   jpg[(size++)+i] = (dims.w)&0xFF;
   for (; i < 15; i++) {
-    // fputc(mid[i], f);
+    fputc(mid[i], f);
     jpg[size+i] = mid[i];
   }
   size += i;
@@ -767,9 +778,11 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
   size += i;
   coef_info[5]++;
   coef_info[6] = 0x11;
+	oldsize = size;
 	size += write_coefficients(f, jpg, dims.w*dims.h, Y, &Luma[0], &Luma[1], size);
 	fill_last_byte(f, jpg, size);
   size++;
+  // printf("size of coef Y = %zu\n", size - oldsize);
 
 	// fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
 	// fputc(0, f); fputc(8, f); // len
@@ -786,9 +799,11 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
   }
   size += i;
   coef_info[5]++;
+	oldsize = size;
 	size += write_coefficients(f, jpg, dims.w*dims.h/4, Cb, &Chroma[0], &Chroma[1], size);
 	fill_last_byte(f, jpg, size);
   size++;
+  // printf("size of coef Cb = %zu\n", size - oldsize);
 
 	// fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
 	// fputc(0, f); fputc(8, f); // len
@@ -800,19 +815,21 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
 	// fputc(0x00, f); // successive approximation bits - default value
 
 	for (i = 0; i < 10; i++) {
-    // fputc(coef_info[i], f);
+    fputc(coef_info[i], f);
     jpg[size+i] = coef_info[i];
   }
   size += i;
   coef_info[5] = 0x01;                                             
   coef_info[6] = 0x00;                                             
+	oldsize = size;
 	size += write_coefficients(f, jpg, dims.w*dims.h/4, Cr, &Chroma[0], &Chroma[1], size);
 	fill_last_byte(f, jpg, size);
   size++;
+  // printf("size of coef Cr = %zu\n", size - oldsize);
 
 	// fputc(0xFF, f); fputc(0xD9, f); // EOI Symbol
   for (i = 0; i < 2; i++) {
-    // fputc(eoi[i], f);
+    fputc(eoi[i], f);
     jpg[size+i] = eoi[i];
   }
   size += i;

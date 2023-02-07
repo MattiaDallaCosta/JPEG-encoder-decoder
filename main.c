@@ -143,7 +143,7 @@ int main(int argc, char ** argv) {
           printf("pre getName\n");
           getName(text, newname, i);
           printf("\033[1A");
-          enlargeAdjust(&diffDims[i]);
+          printf("diffDims[%i] = {%i, %i, %i, %i}\n", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
           rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i]);
 	        init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
           size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
@@ -184,9 +184,9 @@ int main(int argc, char ** argv) {
       rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage);
       init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
       size_t size = write_file(newname, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-      // printf("size = %zu\n", size);
+      printf("size = %zu       \n", size);
       // printf("jpg[%zu] = %i, jpg[%lu] = %i\n", size-2, jpg[size-2], size-1, jpg[size-1]);
-      FILE * out = fopen(newname, "w+");
+      FILE * out = fopen("comparison.jpg", "w+");
       for (i = 0; i < size; i++) fputc(jpg[i], out);
       fclose(out);
       gettimeofday(&op_t, NULL);
