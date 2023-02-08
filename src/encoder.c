@@ -45,6 +45,12 @@ const int scan_order[] = {
 58, 59, 52, 45, 38, 31, 39, 46,
 53, 60, 61, 54, 47, 55, 62, 63};
 
+/* int readPpm(FILE* f, uint8_t * raw)
+ *  f = pointer to the file beeing read
+ *  raw = array where the regb sequence retreived from the file is saved
+ *
+ *  function that reads a ppm file and stores in an array the rgb sequence contained in it 
+ */
 int readPpm(FILE* f, uint8_t * raw) {
 	if( fgetc(f) != 'P' || fgetc(f) != '6' )
 	{
@@ -104,11 +110,23 @@ X:	fprintf(stderr, "Could not parse the PPM file properly\n");
 	return -1;
 }
 
-
-double_t getDouble(const int64_t *bitval) {       // convert the double_t value, saved as int64_t in order
-    return *((double_t*)(bitval));                // to maintain the preciseness, into an actual double_t
+/* double_t getDouble(const int64_t *bitval)
+ *  bitval = pointer to the int64_t to be converted in double
+ *
+ *  function that returns the double_t value stored in an int64_t variable
+ *  (to maintain preciseness and avoid calculating it at startup)
+ */
+double_t getDouble(const int64_t *bitval) {
+    return *((double_t*)(bitval));
 }
 
+/* void getName(char *name, char *buff, int num)
+ *  name = the string containing the name of the original file
+ *  buff = the string where the new name is stored
+ *  num = the number of the difference of which the jpg is beeing done (-1 if full image)
+ *
+ *  function that writes the string containing the name for the jpg file where to save the converted image 
+ */
 void getName(char *name, char *buff, int num) {
   char *pos;
   strcpy(buff, name);
@@ -119,6 +137,12 @@ void getName(char *name, char *buff, int num) {
   strcpy(pos, end);
 }
 
+/* void getSavedName(char *name, char *buff) 
+ *  name = the string containing the name of the original file
+ *  buff = the string where the new name is stored
+ *  
+ *  function that writes the string containing the name for the ppm where to save the subsampled image 
+ */
 void getSavedName(char *name, char *buff) {
   char *pos;
   strcpy(buff, name);
@@ -127,17 +151,25 @@ void getSavedName(char *name, char *buff) {
 }
 
 /* zigzag_block(int16_t in[64], int16_t * out)
+ *  in = array containing the block to be reordered
+ *  out = array where to put the reordered sequence
+ *
  *  function that reorders a block based on the scan_order array
  *  with the purpose of grouping the non 0 values at the beginning of the array 
  */
-
 void zigzag_block(int16_t in[64], int16_t * out) {
 	int i = 0;
 	for (; i < 64; i++) {
     out[i] = in[scan_order[i]];
   }
 }
+
 /* dct_block(int gap, uint8_t in[], int16_t * out, const int quantizer[])
+ *  gap = distance from the left border of the image
+ *  in = input array containing a single channel of YCbCr (the 2 crominances are subsampled)
+ *  out = array where to store the reordered dct block
+ *  quantizer = the array containing the quantization table for the channel to be transformed
+ *
  *  function that applies the discrete cosine transform to the image blocks
  *  (8x8 blocks as specified from the JPG specification) 
  */
@@ -174,15 +206,14 @@ void dct_block(int gap, uint8_t in[], int16_t * out, const int quantizer[]) {
   zigzag_block(dct, out);                   // applies the reordering funcion
 }
 
-/*  rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, int dimw) 
- *    in = array of rgb , [Y,Cb,Cr] recipients for the 3 output channels
- *    [offx,offy] offset in the two axes from the beginning of in (in number of 16x16 blocks done) 
+/* rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, area_t dims) 
+ *  in = array of rgb , [Y,Cb,Cr] recipients for the 3 output channels
+ *  [offx,offy] offset in the two axes from the top left corner of dims (in number of 16x16 blocks done) 
+ *  dims = area of the image containing the difference (used for the x and y offsets in the image)
  *  
- *    function that converts a block of rgb in a block of dct reorderd to group the 0s togeder 
+ *  function that converts a block of rgb in a block of dct reorderd to group the 0s togeder 
  */
-
 void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, area_t dims) {
-  // printf("offx = %i, offy = %i, dimmw = %i\n", offx, offy, dimw);
   int i = 0;
   uint8_t app[2][32];                                               //2 channels (Cb, Cr) of 2 lines of the 16x16 block of pixels
   uint32_t offCbCr = (offy*dims.w/16 + offx)*64;                    
@@ -213,7 +244,10 @@ void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx
 }
 
 /* rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims)
- *  applies the rgb_to_dct_block to all the 16x16 blocks of the image in the area defined by dims
+ *  in = array of rgb , [Y,Cb,Cr] recipients for the 3 output channels
+ *  dims = area of the image containing the difference 
+ *  
+ *  function that applies the rgb_to_dct_block to all the 16x16 blocks of the image in the area defined by dims
  */
 void rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) {
   int i;
@@ -225,7 +259,7 @@ void rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) 
     offy = i/(dims.w/16);
     rgb_to_dct_block(in, Y, Cb, Cr, offx, offy, dims);
   }
-  for (i = 0; i < dims.w*dims.h/64; i++) {  // loops on each dc frequency and applyes
+  for (i = 0; i < dims.w*dims.h/64; i++) {  // loops on each dc frequency and applyes the differentiation
     Y[i*64] -= last[0];
     last[0] += Y[i*64];
     if(i < dims.w*dims.h/256){
@@ -598,66 +632,6 @@ size_t write_dht_header(FILE* f, uint8_t * jpg, int code_len_freq[], int sym_sor
   return size;
 }
 
-// size_t write_jpg(uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
-//   size_t size = 0;
-//   int i;
-
-// 	for (i=0; i<20; i++) jpg[size+i] = head[i];
-//   size += i;
-// 	for (i=0; i<5; i++) jpg[size+i] = dqt_sym[i];
-//   size += i;
-// 	for (i=0; i<64; i++) jpg[size+i] = luma_quantizer[scan_order[i]];
-//   dqt_sym[4] += 1;
-//   size += i;
-// 	for (i=0; i<5; i++) jpg[size+i] = dqt_sym[i];
-//   size += i;
-//   dqt_sym[4] -= 1;
-// 	for (i=0; i<64; i++) jpg[size+i] = chroma_quantizer[scan_order[i]];
-//   size += i;
-
-// 	size += write_dht_header(jpg, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00, size); // da sistemare
-// 	size += write_dht_header(jpg, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10, size);
-// 	size += write_dht_header(jpg, Chroma[0].code_len_freq, Chroma[0].sym_sorted, 0x01, size);
-// 	size += write_dht_header(jpg, Chroma[1].code_len_freq, Chroma[1].sym_sorted, 0x11, size);
-
-// 	for (i=0; i<5; i++) jpg[size+i] = mid[i];
-//   jpg[(size++)+i] = ((dims.h)>>8)&0xFF;
-//   jpg[(size++)+i] = (dims.h)&0xFF;
-//   jpg[(size++)+i] = ((dims.w)>>8)&0xFF;
-//   jpg[(size++)+i] = (dims.w)&0xFF;
-//   for (; i < 15; i++) jpg[size+i] = mid[i];
-//   size += i;
-// 	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];
-//   size += i;
-//   coef_info[5]++;
-//   coef_info[6] = 0x11;
-
-// 	size += write_coefficients(jpg, dims.w*dims.h, Y, &Luma[0], &Luma[1], size); // da sistemare
-//   fill_last_byte(jpg, size); // da sistemare             
-// 	size += 1;
-
-// 	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];
-//   size += i;
-//   coef_info[5]++;
-
-//   size += write_coefficients(jpg, dims.w*dims.h/4, Cb, &Chroma[0], &Chroma[1], size);
-//   fill_last_byte(jpg, size); // da sistemare                       
-// 	size += 1;                                                       
-//                                                                    
-// 	for (i = 0; i < 10; i++) jpg[size+i] = coef_info[i];             
-//   size += i;                                                       
-//   coef_info[5] = 0x01;                                             
-//   coef_info[6] = 0x00;                                             
-//                                                                    
-//   size += write_coefficients(jpg, dims.w*dims.h/4, Cr, &Chroma[0], &Chroma[1], size);
-//   fill_last_byte(jpg, size); // da sistemare
-// 	size += 1;
-
-//   for (i = 0; i < 2; i++) jpg[size+i] = eoi[i];
-//   size += i;
-
-//   return size;
-// }
 
 int head[] = { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00 };
 int dqt_sym[] = { 0xFF, 0xDB, 0x00, 0x43, 0x00 };
@@ -665,8 +639,17 @@ int mid[] = { 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 
 int coef_info[] = { 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00 };
 int eoi[] = { 0xFF, 0xD9 };
 
+/* size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2])
+ *  file_name = name of the file  where to write the jpg out
+ *  jpg = array where to store the final jpg data
+ *  [Y,Cb,Cr] recipients for the 3 output channels
+ *  dims = area of the image containing the difference 
+ *  [Luma, Chroma] pair of structs containing the information of the huffman code for each channel
+ *
+ *  function that generates and writes the jpg data into a file 
+ */
 size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
-	size_t appsize, oldsize, size = 0;
+	size_t size = 0;
   int i;
 	FILE* f = fopen(file_name, "w");
 	// fputc(0xFF, f); fputc(0xD8, f);               // SOI Symbol
@@ -718,19 +701,10 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
   }
   size += i;
 
-  appsize = oldsize = size;
 	size += write_dht_header(f, jpg, Luma[0].code_len_freq,   Luma[0].sym_sorted, 0x00, size);
-  // printf("size of first header = %zu\n", size - appsize);
-  appsize = size;
 	size += write_dht_header(f, jpg, Luma[1].code_len_freq,   Luma[1].sym_sorted, 0x10, size);
-  // printf("size of second header = %zu\n", size - appsize);
-  appsize = size;
 	size += write_dht_header(f, jpg, Chroma[0].code_len_freq, Chroma[0].sym_sorted, 0x01, size);
-  // printf("size of third header = %zu\n", size - appsize);
-  appsize = size;
 	size += write_dht_header(f, jpg, Chroma[1].code_len_freq, Chroma[1].sym_sorted, 0x11, size);
-  // printf("size of forth header = %zu\n", size - appsize);
-  // printf("size of all headers = %zu\n", size - oldsize);
 
 	// fputc(0xFF, f); fputc(0xC0, f); // SOF0 Symbol (Baseline DCT)
 	// fputc(0, f); fputc(17, f); // len
@@ -778,11 +752,9 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
   size += i;
   coef_info[5]++;
   coef_info[6] = 0x11;
-	oldsize = size;
 	size += write_coefficients(f, jpg, dims.w*dims.h, Y, &Luma[0], &Luma[1], size);
 	fill_last_byte(f, jpg, size);
   size++;
-  // printf("size of coef Y = %zu\n", size - oldsize);
 
 	// fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
 	// fputc(0, f); fputc(8, f); // len
@@ -799,11 +771,9 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
   }
   size += i;
   coef_info[5]++;
-	oldsize = size;
 	size += write_coefficients(f, jpg, dims.w*dims.h/4, Cb, &Chroma[0], &Chroma[1], size);
 	fill_last_byte(f, jpg, size);
   size++;
-  // printf("size of coef Cb = %zu\n", size - oldsize);
 
 	// fputc(0xFF, f); fputc(0xDA, f); // SOS Symbol
 	// fputc(0, f); fputc(8, f); // len
@@ -821,11 +791,9 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
   size += i;
   coef_info[5] = 0x01;                                             
   coef_info[6] = 0x00;                                             
-	oldsize = size;
 	size += write_coefficients(f, jpg, dims.w*dims.h/4, Cr, &Chroma[0], &Chroma[1], size);
 	fill_last_byte(f, jpg, size);
   size++;
-  // printf("size of coef Cr = %zu\n", size - oldsize);
 
 	// fputc(0xFF, f); fputc(0xD9, f); // EOI Symbol
   for (i = 0; i < 2; i++) {
@@ -838,7 +806,10 @@ size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int
   return size;
 }
 /* int writePpm(FILE * f, uint8_t *sub)
- *  writes the subsampled rgb array (sub) into a .ppm file (f) of the original dimensions
+ *  f = pointer to the file to write to
+ *  sub = array of rgb values to be stored in f
+ *
+ *  function that writes the subsampled rgb array (sub) into a .ppm file (f) of the original dimensions
  */
 int writePpm(FILE * f, uint8_t *sub) {
   fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
