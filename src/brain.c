@@ -45,8 +45,8 @@ void store(uint8_t *in, uint8_t saved[3*PIX_LEN/16]) {
 }
 
 int overlap(area_t a1, area_t a2){
-  int orizover = !(a1.x > a2.w + 2 || a1.w + 2 < a2.x);
-  int vertover = !(a1.y > a2.h + 2 || a1.h + 2 < a2.y);
+  int orizover = !(a1.x > a2.w + 1 || a1.w + 1 < a2.x);
+  int vertover = !(a1.y > a2.h + 1 || a1.h + 1 < a2.y);
   return orizover && vertover;
 }
 
@@ -100,7 +100,7 @@ uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t 
           if(differences[index][k].end < differences[!index][z].beg-1 || differences[index][k].beg > differences[!index][z].end+1)  continue;
           added = 1;
           if (differences[index][k].done >= 0) {
-            // printf("k is done\n");
+            // printf("k[%i - %i] is done\n", k, z);
             int minout = MIN(differences[!index][z].done, differences[index][k].done);
             int maxout = MAX(differences[!index][z].done, differences[index][k].done);
             if (maxout == minout) continue;
@@ -123,7 +123,8 @@ uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t 
               if (differences[!index][a].done == outsIndex) differences[!index][a].done = maxout;
             }
           } else {
-            // printf("k is not done\n");
+            // printf("k[%i - %i] is not done\n", k, z);
+            differences[index][k].done = differences[!index][z].done;
             area_t a = {.x = differences[index][k].beg, .y = differences[index][k].row, .w = differences[index][k].end, .h = differences[index][k].row};
             sumAreas(&outs[differences[!index][z].done], a);
           }
@@ -183,33 +184,46 @@ uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t 
       }
     }
   }
-  printf("outIndex = %i\n", outsIndex);
-  for (int i = 0; i < outsIndex; i++) enlargeAdjust(&outs[i]);
-  for (i = 0; i < outsIndex; i++) for (int j = i+1; j < outsIndex; j++) {
-    if (overlap2(outs[i], outs[j])) {
-      sumAreas(&outs[i], outs[j]);
-      outsIndex--;
-      outs[j].x = outs[outsIndex].x;
-      outs[j].y = outs[outsIndex].y;
-      outs[j].w = outs[outsIndex].w;
-      outs[j].h = outs[outsIndex].h;
-    }
+  printf("outsIndex = %i\n", outsIndex);
+  for (i = 0; i < outsIndex; i++) enlargeAdjust(&outs[i]);
+  for (i = 0; i < outsIndex; i++) for (int j = i+1; j < outsIndex; j++) if (overlap2(outs[i], outs[j])) {
+    sumAreas(&outs[i], outs[j]);
+    outsIndex--;
+    outs[j].x = outs[outsIndex].x;
+    outs[j].y = outs[outsIndex].y;
+    outs[j].w = outs[outsIndex].w;
+    outs[j].h = outs[outsIndex].h;
+    j--;
   }
-  printf("outIndex = %i\n", outsIndex);
+  printf("outsIndex = %i\n", outsIndex);
+  i = 0;
+  while(i < outsIndex) if (outs[i].w < 32 || outs[i].h < 24) {
+    outsIndex--;
+    if (i < outsIndex) {
+      outs[i].x = outs[outsIndex].x;
+      outs[i].y = outs[outsIndex].y;
+      outs[i].w = outs[outsIndex].w;
+      outs[i].h = outs[outsIndex].h;
+    }
+    outs[outsIndex].x = -1;
+    outs[outsIndex].y = -1;
+    outs[outsIndex].w = -1;
+    outs[outsIndex].h = -1;
+  } else i++;
   return outsIndex;
 }
 
-inline void enlargeAdjust(area_t * a){
+void enlargeAdjust(area_t * a) {
+  a->w = a->w - a->x + 1;
+  a->h = a->h - a->y + 1;
   a->x *= 4;
   a->y *= 4;
   a->w *= 4;
   a->h *= 4;
-  a->w = a->w - a->x + 1;
-  a->h = a->h - a->y + 1;
-  a->x -= (16 - (a->w%16))/2;
-  a->y -= (16 - (a->h%16))/2;
-  a->w = a->w%16 ? a->w + (16 - a->w%16) : a->w;
-  a->h = a->h%16 ? a->h + (16 - a->h%16) : a->h;
+  a->x -= a->w%16 ? (16 - (a->w%16))/2 : 0;
+  a->y -= a->h%16 ? (16 - (a->h%16))/2 : 0;
+  a->w += a->w%16 ? (16 - a->w%16) : 0;
+  a->h += a->h%16 ? (16 - a->h%16) : 0;
   a->x -= a->x + a->w > WIDTH ? a->x + a->w - WIDTH : 0;
   a->y -= a->y + a->h > HEIGHT ? a->y + a->h - HEIGHT : 0;
   a->x = a->x < 0 ? 0 : a->x;
