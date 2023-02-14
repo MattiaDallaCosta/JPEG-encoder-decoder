@@ -1,16 +1,10 @@
-#include <esp_log.h>
-#include <driver/gpio.h>
-#include <esp_system.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <sys/param.h>
+#include <string.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
-// Include FreeRTOS for delay
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include "esp_timer.h"
-#include "esp_sleep.h"
+#include <unistd.h>
+#include "esp_vfs_fat.h"
+#include "sdmmc_cmd.h"
 #include "esp_camera.h"
 #include "img_converters.h"
 
@@ -18,23 +12,22 @@
 #include "../include/brain.h"
 #include "../include/encoder.h"
 
-#define LED 33 // LED connected to GPIO2
-
 static const char *TAG = "image comparator";
 
-static esp_err_t init_camera();
-static void photo_callback(void* arg);
+#define MOUNT_POINT "/sdcard"
 
-// uint8_t *raw;
-// uint8_t *sub;
+const char *sub_file = MOUNT_POINT"/sub";
+const char *store_file = MOUNT_POINT"/stored";
+const char *j_file = MOUNT_POINT"/jpg";
+const char *Y_file = MOUNT_POINT"/Y";
+const char *Cb_file = MOUNT_POINT"/Cb";
+const char *Cr_file = MOUNT_POINT"/Cr";
+const char *info_file = MOUNT_POINT"/info";
+
+static esp_err_t init_camera();
 
 uint8_t EXT_RAM_BSS_ATTR raw[3*PIX_LEN];
 uint8_t EXT_RAM_BSS_ATTR sub[3*PIX_LEN/16];
-
-// int16_t *ordered_dct_Y;
-// int16_t *ordered_dct_Cb;
-// int16_t *ordered_dct_Cr;
-// uint8_t *jpg;
 
 int16_t EXT_RAM_BSS_ATTR ordered_dct_Y[PIX_LEN];
 int16_t EXT_RAM_BSS_ATTR ordered_dct_Cb[PIX_LEN/4];
@@ -42,12 +35,12 @@ int16_t EXT_RAM_BSS_ATTR ordered_dct_Cr[PIX_LEN/4];
 uint8_t EXT_RAM_BSS_ATTR jpg[3*PIX_LEN];
 
 uint8_t EXT_RAM_BSS_ATTR saved[3*PIX_LEN/16];
-area_t EXT_RAM_BSS_ATTR diffDims[20];
+area_t EXT_RAM_BSS_ATTR diffDims[100];
 pair_t EXT_RAM_BSS_ATTR differences[2][WIDTH/8];
 huff_code EXT_RAM_BSS_ATTR Luma[2];
 huff_code EXT_RAM_BSS_ATTR Chroma[2];
 uint8_t different = 0;
-int timer_val = 1000000;
+int sleep_val = 1000000;
 area_t fullImage = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
 camera_fb_t* fb;
 
@@ -79,88 +72,104 @@ static camera_config_t camera_config = {
   .fb_location = CAMERA_FB_IN_PSRAM
 };
 
-int app_main() {
-  int i;
-  // Use settings defined above to initialize and mount SPIFFS filesystem.
-  // Note: esp_vfs_spiffs_register is an all-in-one convenience function.
+esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+    .format_if_mount_failed = false,
+    .max_files = 5,
+    .allocation_unit_size = 16 * 1024
+};
+
+spi_bus_config_t bus_cfg = {
+    .mosi_io_num = PIN_NUM_MOSI,
+    .miso_io_num = PIN_NUM_MISO,
+    .sclk_io_num = PIN_NUM_CLK,
+    .quadwp_io_num = -1,
+    .quadhd_io_num = -1,
+    .max_transfer_sz = 4000,
+};
+
+void app_main(void) {
+  sdmmc_card_t *card;
+  const char mount_point[] = MOUNT_POINT;
+  ESP_LOGI(TAG, "Initializing SD card");
+  ESP_LOGI(TAG, "Using SPI peripheral");
+
+  sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+  esp_err_t ret = spi_bus_initialize(host.slot, &bus_cfg, SDSPI_DEFAULT_DMA);
+  if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to initialize bus.");
+      return;
+  }
+  sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+  slot_config.gpio_cs = PIN_NUM_CS;
+  slot_config.host_id = host.slot;
+
+  ESP_LOGI(TAG, "Mounting filesystem");
+  ret = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
+
+  if (ret != ESP_OK) {
+      if (ret == ESP_FAIL) {
+          ESP_LOGE(TAG, "Failed to mount filesystem. "
+                   "If you want the card to be formatted, set the CONFIG_EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
+      } else {
+          ESP_LOGE(TAG, "Failed to initialize the card (%s). "
+                   "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
+      }
+      return;
+  }
+  ESP_LOGI(TAG, "Filesystem mounted");
+
+  sdmmc_card_print_info(stdout, card);
+  // camera
+  int i = 0;
   init_camera();
+  vTaskDelay(100 / portTICK_PERIOD_MS);
   fb = esp_camera_fb_get();
-  // esp_camera_fb_return(fb);
-  // fb = esp_camera_fb_get();
-  ESP_LOGI(TAG, "taken photo");
-  ESP_LOGI(TAG, "image size: %zu, %zux%zu", fb->len, fb->width, fb->height);
-  fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
   esp_camera_fb_return(fb);
-  ESP_LOGI(TAG, "post jpg to rgb");
-  subsample(raw, sub);
+  fb = esp_camera_fb_get();
+  esp_camera_fb_return(fb);
+  FILE* sub_f = fopen(store_file, "w");
+  subsample(sub_f, raw, sub);
   store(sub, saved);
-  ESP_LOGI(TAG, "post store");
-  const esp_timer_create_args_t timer_args = {
-          .callback = &photo_callback,
-          /* name is optional, but may help identify the timer when debugging */
-          .name = "periodic"
-  };
-  esp_timer_handle_t timer;
-  ESP_ERROR_CHECK(esp_timer_create(&timer_args, &timer));
-  ESP_ERROR_CHECK(esp_timer_start_periodic(timer, timer_val));
+  fclose(sub_f);
   ESP_LOGI(TAG, "--- finished initialization ---");
-  // Main loop
-  while(true) {
-    for (i = 0; i < 20; i++) {
-      diffDims[i].x = -1;
-      diffDims[i].y = -1;
-      diffDims[i].w = -1;
-      diffDims[i].h = -1;
-    }
-    for (i = 0; i < WIDTH/8; i++) {
-      differences[1][i].beg = differences[0][i].beg = -1;
-      differences[1][i].end = differences[0][i].end = -1;
-      differences[1][i].row = differences[0][i].row = -1;
-      differences[1][i].done = differences[0][i].done = -1;
-    }
-    different = 0;
+  while (1) {
     fb = esp_camera_fb_get();
     esp_camera_fb_return(fb);
     fb = esp_camera_fb_get();
-    ESP_LOGI(TAG, "image capture"); 
-    ESP_LOGI(TAG, "pre decoding");
     fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
-    ESP_LOGI(TAG, "post decoding");
     esp_camera_fb_return(fb);
-    ESP_LOGI(TAG, "pre sub");
-    subsample(raw,sub);
-    ESP_LOGI(TAG, "post sub");
-    different = compare(sub, saved, diffDims, differences);
-    ESP_LOGI(TAG, "post compare: different = %i", different);
-    if (different) {
-      for (int i = 0; i < different; i++) {
-        // gettimeofday(&appo, NULL);
-        ESP_LOGI(TAG, "pre [%i] {%i, %i, %i, %i}", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-        enlargeAdjust(diffDims+i);
-        ESP_LOGI(TAG, "post [%i] {%i, %i, %i, %i}", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-        rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cb, diffDims[i]);
+    sub_f = fopen(sub_file, "w");
+    subsample(sub_f, raw, sub);
+    fclose(sub_f);
+    int different = compare(sub, saved, diffDims, differences);
+    if(different) {
+      ESP_LOGI(TAG, "Images are different [#differences = %i]%s", different, sleep_val == 10000 ? "\nsleep timer set to 1s" : "");
+      for (i = 0; i < different; i++) {
+        ESP_LOGI(TAG, "diffDims[%i] = {%i, %i, %i, %i}", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
+        rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i]);
 	      init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-	      size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-        // gettimeofday(&op_t, NULL);
-        // millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
-        // secelapsed = (op_t.tv_sec - appo.tv_sec);
-        // printf("conversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
+        char jpg_file[1024], end[10];
+        strcpy(jpg_file, j_file);
+        sprintf(end, "-%i", i);
+        strcat(jpg_file, end);
+        ESP_LOGI(TAG, "name for jpg = %s", jpg_file);
+        FILE * jpg_f = fopen(jpg_file, "w");
+	      size_t size = write_jpg(jpg_f, jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
+        fclose(jpg_f);
+      sleep_val = 1000;
       }
     } else {
-      rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cb, fullImage);
-      ESP_LOGI(TAG, "post dct");
-	    init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-      ESP_LOGI(TAG, "post huffman");
-	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-      ESP_LOGI(TAG, "post encode: size = %zu", size);
-      ESP_LOGW(TAG, "last characters: %i, %i", jpg[size - 2], jpg[size - 1]);
-      ESP_LOGI(TAG, "post free");
+      ESP_LOGI(TAG, "Images are the same%s", sleep_val == 1000 ? "\nsleep timer set to 10s" : "");
+      sleep_val = 10000;
     }
+    struct stat st;
+    if(!stat(store_file, &st)) unlink(store_file);
     store(sub, saved);
-    ESP_LOGI(TAG, "post save");
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    ESP_LOGI(TAG, "--- finished cicle ---\n");
+    if (rename(sub_file, store_file)) ESP_LOGE(TAG, "Rename failed");
+    vTaskDelay(sleep_val / portTICK_PERIOD_MS);
   }
+    ESP_LOGI(TAG, "done");
+    return;
 }
 
 static esp_err_t init_camera() {
@@ -169,12 +178,10 @@ static esp_err_t init_camera() {
   esp_err_t err = esp_camera_init(&camera_config);
 
   if (err != ESP_OK) {
-    //delay(100);  // need a delay here or the next serial o/p gets missed
     ESP_LOGE(TAG, "CRITICAL FAILURE: Camera sensor failed to initialise.");
     ESP_LOGE(TAG, "A full (hard, power off/on) reboot will probably be needed to recover from this.");
     return err;
   } else {
-    ESP_LOGI(TAG, "succeeded");
 
     // Get a reference to the sensor
     sensor_t* s = esp_camera_sensor_get();
@@ -189,62 +196,4 @@ static esp_err_t init_camera() {
     }
   }
   return ESP_OK;
-}
-
-static void photo_callback(void *arg) {
-  int i;
-  for (i = 0; i < 20; i++) {
-    diffDims[i].x = -1;
-    diffDims[i].y = -1;
-    diffDims[i].w = -1;
-    diffDims[i].h = -1;
-  }
-  for (i = 0; i < WIDTH/8; i++) {
-    differences[1][i].beg = differences[0][i].beg = -1;
-    differences[1][i].end = differences[0][i].end = -1;
-    differences[1][i].row = differences[0][i].row = -1;
-    differences[1][i].done = differences[0][i].done = -1;
-  }
-  different = 0;
-  fb = esp_camera_fb_get();
-  esp_camera_fb_return(fb);
-  fb = esp_camera_fb_get();
-  ESP_LOGI(TAG, "image capture"); 
-  ESP_LOGI(TAG, "pre decoding");
-  fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, raw);
-  ESP_LOGI(TAG, "post decoding");
-  esp_camera_fb_return(fb);
-  ESP_LOGI(TAG, "pre sub");
-  subsample(raw,sub);
-  ESP_LOGI(TAG, "post sub");
-  different = compare(sub, saved, diffDims, differences);
-  ESP_LOGI(TAG, "post compare: different = %i", different);
-  if (different) {
-    for (int i = 0; i < different; i++) {
-      // gettimeofday(&appo, NULL);
-      ESP_LOGI(TAG, "pre [%i] {%i, %i, %i, %i}", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-      enlargeAdjust(diffDims+i);
-      ESP_LOGI(TAG, "post [%i] {%i, %i, %i, %i}", i, diffDims[i].x, diffDims[i].y, diffDims[i].w, diffDims[i].h);
-      rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cb, diffDims[i]);
-	    init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-	    size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, diffDims[i], Luma, Chroma);
-      // gettimeofday(&op_t, NULL);
-      // millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
-      // secelapsed = (op_t.tv_sec - appo.tv_sec);
-      // printf("conversion time for diff #%i:          %li:%li:%li.%s%li\n", i, (secelapsed/3600)%60, (secelapsed/60)%60, (secelapsed)%60, ((millielapsed)%1000) > 99 ? "" : (((millielapsed)%1000) > 9 ? "0" : "00"), (millielapsed)%1000);
-    }
-  } else {
-    rgb_to_dct(raw, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cb, fullImage);
-    ESP_LOGI(TAG, "post dct");
-	  init_huffman(ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-    ESP_LOGI(TAG, "post huffman");
-	  size_t size = write_jpg(jpg, ordered_dct_Y, ordered_dct_Cb, ordered_dct_Cr, fullImage, Luma, Chroma);
-    ESP_LOGI(TAG, "post encode: size = %zu", size);
-    ESP_LOGW(TAG, "last characters: %i, %i", jpg[size - 2], jpg[size - 1]);
-    ESP_LOGI(TAG, "post free");
-  }
-  store(sub, saved);
-  ESP_LOGI(TAG, "post save");
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
-  ESP_LOGI(TAG, "--- finished cicle ---\n");
 }

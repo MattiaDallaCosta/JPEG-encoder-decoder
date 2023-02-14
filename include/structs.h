@@ -2,12 +2,6 @@
 
 #include "define.h"
 
-// typedef struct {
-//   long mtype;
-//   char mtext[100];
-//   int len;
-// } msg_t;
-
 typedef struct __huff_code {
 	int sym_freq[257];     // frequency of occurrence of symbol i
 	int code_len[257];     // code length of symbol i
