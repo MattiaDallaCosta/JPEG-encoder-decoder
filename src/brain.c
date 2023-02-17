@@ -88,7 +88,32 @@ uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t 
     differences[1][i].beg = differences[1][i].end = differences[1][i].row = differences[1][i].done = -1;
   }
   for(i = 0; i < PIX_LEN/16; i++) {
-    if (!(i%(WIDTH/4))) {
+    double cR =  in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))] + saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))];
+    cR /= 2;
+    uint32_t Rdelta = (double)(in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))] - saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))]);
+    uint32_t Gdelta = (double)(in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+1] - saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+1]);
+    uint32_t Bdelta = (double)(in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+2] - saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+2]);
+    Rdelta *= Rdelta;
+    Gdelta *= Gdelta;
+    Bdelta *= Bdelta;
+    Rdelta *= (2 + (cR/256));
+    Gdelta *= 4;
+    Bdelta *= (2 + ((255 - cR)/256));
+    if ((Rdelta + Gdelta + Bdelta) > 600) {
+      if(!isDifferent) {
+        isDifferent = 1;
+        differences[index][j].beg = i%(WIDTH/4);
+        differences[index][j].row = i/(WIDTH/4);
+        differences[index][j].done = -1;
+      }
+      differences[index][j].end = i%(WIDTH/4);
+    } else {
+      if (isDifferent) { 
+        isDifferent = 0;
+        j++;
+      }
+    }
+    if (i%(WIDTH/4) == WIDTH/4 - 1) {
       for (int k = 0; k < j; k++) {
         int a = 0;
         int added = 0;
@@ -148,31 +173,6 @@ uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t 
       isDifferent = 0;
       oldj = j;
       j = 0;
-    }
-    double cR =  in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))] + saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))];
-    cR /= 2;
-    uint32_t Rdelta = (double)(in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))] - saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))]);
-    uint32_t Gdelta = (double)(in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+1] - saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+1]);
-    uint32_t Bdelta = (double)(in[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+2] - saved[3*((i/(WIDTH/4))*(WIDTH/4)+(i%(WIDTH/4)))+2]);
-    Rdelta *= Rdelta;
-    Gdelta *= Gdelta;
-    Bdelta *= Bdelta;
-    Rdelta *= (2 + (cR/256));
-    Gdelta *= 4;
-    Bdelta *= (2 + ((255 - cR)/256));
-    if ((Rdelta + Gdelta + Bdelta) > 600) {
-      if(!isDifferent) {
-        isDifferent = 1;
-        differences[index][j].beg = i%(WIDTH/4);
-        differences[index][j].row = i/(WIDTH/4);
-        differences[index][j].done = -1;
-      }
-      differences[index][j].end = i%(WIDTH/4);
-    } else {
-      if (isDifferent) { 
-        isDifferent = 0;
-        j++;
-      }
     }
   }
   printf("outsIndex = %i\n", outsIndex);
