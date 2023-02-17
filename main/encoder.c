@@ -97,63 +97,6 @@ void dct_block(int gap, uint8_t in[], int16_t * out, const int quantizer[]) {
   zigzag_block(dct, out);                   // applies the reordering funcion
 }
 
-void dct_block2(int gap, uint8_t in[], int16_t * out, const int quantizer[]) {
-	int x_f, y_f; // frequency domain coordinates
-	int x_t, y_t; // space domain coordinates
-
-	// double inner_lookup[64];            // an internal lookup where the first partial transform can be saved
-	double freq;
-	int16_t dct[64];                    // an internal lookup where the final dct values can be saved before the zigzag function
-	for (y_f=0; y_f<8; y_f++)           // loops on the various columns
-	  for (x_f=0; x_f<8; x_f++)         // loops on the various frequencies on each column
-		{
-			freq = 0;  //creates the value of each partial transform
-			for (y_t=0; y_t<8; y_t++)
-			  for(x_t=0; x_t<8; x_t++)              //creates the value of each partial transform
-				freq += ( in[y_t*gap+x_t] - 128 ) * getDouble(lookup_table + (y_t*8 + y_f)); // cos_lookup[y_t][y_f];
-
-		}
-
-	// freq(x_f,y_f) = ...
-	for (y_f=0; y_f<8; y_f++)                 // loops on the various columns
-    for (x_f=0; x_f<8; x_f++) {             // loops on the various frequencies on each column
-			freq = 0;                                                                                
-			for(x_t=0; x_t<8; x_t++)              //creates the value of each partial transform
-				freq += inner_lookup[x_t*8 + y_f] * getDouble(lookup_table + (x_t*8 + x_f)); //cos_lookup[x_t][x_f];
-
-			if (x_f == 0) freq *= M_SQRT1_2;      //  multiplies the values with fx = 0 by 1/((2)^(1/2))
-			if (y_f == 0) freq *= M_SQRT1_2;      //  multiplies the values with fy = 0 by 1/((2)^(1/2))
-			freq /= 4;
-
-		  dct[y_f*8+x_f] = freq / quantizer[y_f*8+x_f%64];      // applies the quantization to the dct
-		  dct[y_f*8+x_f] = CLIP(dct[y_f*8+x_f], -2048, 2047);
-		}
-  zigzag_block(dct, out);                   // applies the reordering funcion
-}
-void dct_block_new(int gap, uint8_t in[], int16_t * out, const int quantizer[]) {
-	int x_f, y_f; // frequency domain coordinates
-	int x_t, y_t; // space domain coordinates
-
-	// double inner_lookup[64];            // an internal lookup where the first partial transform can be saved
-	int16_t dct[64];                    // another internal lookup where the final dct values can be saved before the zigzag function
-	double freq;
-	for (x_f=0; x_f<8; x_f++)           // loops on the various columns
-		for (y_f=0; y_f<8; y_f++) {       // loops on the various frequencies on each column
-			freq = 0;  //creates the value of each partial transform
-			for (y_t=0; y_t<8; y_t++)
-			  for(x_t=0; x_t<8; x_t++)              //creates the value of each partial transform
-				  freq += ( in[y_t*gap+x_t] - 128 ) * getDouble(lookup_table + (y_t*8 + y_f)) * getDouble(lookup_table + (x_t*8 + x_f)); // cos_lookup[y_t][y_f];
-			    
-        if (x_f == 0) freq *= M_SQRT1_2;      //  multiplies the values with fx = 0 by 1/((2)^(1/2))
-			  if (y_f == 0) freq *= M_SQRT1_2;      //  multiplies the values with fy = 0 by 1/((2)^(1/2))
-			  freq /= 4;
-        
-		    dct[y_f*8+x_f] = freq / quantizer[y_f*8+x_f%64];      // applies the quantization to the dct
-		    dct[y_f*8+x_f] = CLIP(dct[y_f*8+x_f], -2048, 2047);
-		}
-  zigzag_block(dct, out);                   // applies the reordering funcion
-}
-
 /*  rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, int dimw) 
  *    in = array of rgb , [Y,Cb,Cr] recipients for the 3 output channels
  *    [offx,offy] offset in the two axes from the beginning of in (in number of 16x16 blocks done) 
