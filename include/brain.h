@@ -5,5 +5,5 @@
 
 void subsample(uint8_t in[3][PIX_LEN], uint8_t out[3][PIX_LEN/16]);
 void store(uint8_t in[3][PIX_LEN/16]);
-int compare(uint8_t in[3][PIX_LEN/16], area_t outs[20]);
+int compare(uint8_t in[3][PIX_LEN/16], area_t outs[100]);
 void enlargeAdjust(area_t * a);

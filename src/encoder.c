@@ -43,6 +43,12 @@ const int scan_order[] = {
 58, 59, 52, 45, 38, 31, 39, 46,
 53, 60, 61, 54, 47, 55, 62, 63};
 
+/* readPpm(FILE* f, uint8_t * raw)
+ *  f = pointer to the file beeing read
+ *  raw = array where the regb sequence retreived from the file is saved
+ *
+ *  function that reads a ppm file and stores in an array the rgb sequence contained in it 
+ */
 int readPpm(FILE* f, uint8_t raw[3][PIX_LEN]) {
 	if( fgetc(f) != 'P' || fgetc(f) != '6' )
 	{
@@ -103,11 +109,23 @@ X:	fprintf(stderr, "Could not parse the PPM file properly\n");
 	return -1;
 }
 
-
-double_t getDouble(const int64_t *bitval) {                                              // convert the double_t value, saved as int64_t in order
-    return *((double_t*)(bitval));                                                                 // to maintain the preciseness, into an actual double_t
+/* getDouble(const int64_t *bitval)
+ *  bitval = pointer to the int64_t to be converted in double
+ *
+ *  function that returns the double_t value stored in an int64_t variable
+ *  (to maintain preciseness and avoid calculating it at startup)
+ */
+double_t getDouble(const int64_t *bitval) {
+    return *((double_t*)(bitval));         
 }
 
+/* void getName(char *name, char *buff, int num)
+ *  name = the string containing the name of the original file
+ *  buff = the string where the new name is stored
+ *  num = the number of the difference of which the jpg is beeing done (-1 if full image)
+ *
+ *  function that writes the string containing the name for the jpg file where to save the converted image 
+ */
 void getName(char *name, char *buff, int num) {
   char *pos;
   strcpy(buff, name);
@@ -118,6 +136,12 @@ void getName(char *name, char *buff, int num) {
   strcpy(pos, end);
 }
 
+/* getSavedName(char *name, char *buff) 
+ *  name = the string containing the name of the original file
+ *  buff = the string where the new name is stored
+ *  
+ *  function that writes the string containing the name for the ppm where to save the subsampled image 
+ */
 void getSavedName(char *name, char *buff) {
   char *pos;
   strcpy(buff, name);
@@ -125,6 +149,13 @@ void getSavedName(char *name, char *buff) {
   strcpy(*pos == '/' ? pos+1 : pos,  "savedImage.ppm");
 }
 
+/* zigzag_block(int16_t in[64], int16_t * out)
+ *  in = array containing the block to be reordered
+ *  out = array where to put the reordered sequence
+ *
+ *  function that reorders a block based on the scan_order array
+ *  with the purpose of grouping the non 0 values at the beginning of the array 
+ */
 void zigzag_block(int16_t in[64], int16_t out[64]) {
 	int i = 0;
 	for (; i < 64; i++) {
@@ -132,6 +163,15 @@ void zigzag_block(int16_t in[64], int16_t out[64]) {
   }
 }
 
+/* dct_block(int gap, uint8_t in[], int16_t * out, const int quantizer[])
+ *  gap = distance from the left border of the image
+ *  in = input array containing a single channel of YCbCr (the 2 crominances are subsampled)
+ *  out = array where to store the reordered dct block
+ *  quantizer = the array containing the quantization table for the channel to be transformed
+ *
+ *  function that applies the discrete cosine transform to the image blocks
+ *  (8x8 blocks as specified from the JPG specification) 
+ */
 void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[]) {
 	int x_f, y_f; // frequency domain coordinates
 	int x_t, y_t; // time domain coordinates
@@ -166,101 +206,34 @@ void dct_block(int gap, uint8_t in[], int16_t out[],const int quantizer[]) {
   zigzag_block(dct, out);
 }
 
-void zigzag(int in[3][PIX_LEN], int out[3][PIX_LEN]) {
-	int i;
-	for (i=0; i<PIX_LEN; i++) {
-		out[0][i] = in[0][(i/64)*64+scan_order[i%64]];
-    if (i< PIX_LEN/4) {
-		   out[1][i] = in[1][(i/64)*64+scan_order[i%64]];
-		   out[2][i] = in[2][(i/64)*64+scan_order[i%64]];
-    }
-	}
-}
-
-void rgb_to_dct_block_old(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, area_t dims) {
-  // printf("offx = %i, offy = %i, dimmw = %i\n", offx, offy, dimw);
-  int i = 0;
-  uint8_t app[2][32];
-  uint32_t offCbCr = (offy*dims.w/16 + offx)*64;
-  uint8_t midY[256];
-  uint8_t midCbCr[2][64];
-  int begin, j;
-  for (i = 0; i < 256; i++) {
-  int r = i%16;
-  int l = i/16;
-  int index = 3*((offy*16+dims.y+l)*WIDTH+offx*16+dims.x+r);
-	midY[i]            =       0.299    * in[index] + 0.587    * in[index+1] + 0.114    * in[index+2];
-	app[0][(l%2)*16+r] = 128 - 0.168736 * in[index] - 0.331264 * in[index+1] + 0.5      * in[index+2];
-	app[1][(l%2)*16+r] = 128 + 0.5      * in[index] - 0.418688 * in[index+1] - 0.081312 * in[index+2];
-    if (r%2 == 1 && l%2 == 1) {
-			 midCbCr[0][(l/2)*8+r/2] = (app[0][r-1] + app[0][r] + app[0][r+15] + app[0][r+16])/4;
-      // printf("midCbCr index: %i\n",(l/2)*8+r/2);
-			 midCbCr[1][(l/2)*8+r/2] = (app[1][r-1] + app[1][r] + app[1][r+15] + app[1][r+16])/4;
-    }
-    if (r%8 == 7 && l%8 == 7) {
-      begin = i - 119;
-      j = ((begin%16) + (begin/16)*2)/8;
-      int ih = j%2; 
-      int iv = j/2; 
-      // printf("i = %i, begin = %i, j = %i\n", i, begin, j);
-      dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy*2+iv)*dims.w/8+offx*2+ih)*64, luma_quantizer);
-        
-    }
-  }
-  printf("C*-index[%i][%i]: %i\n", offy, offx, offCbCr/64);
-  dct_block(8, midCbCr[0], Cb + offCbCr, chroma_quantizer);
-  dct_block(8, midCbCr[1], Cr + offCbCr, chroma_quantizer);
-}
-void rgb_to_dct_new(uint8_t in[3*PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
-  int i = 0;
-  int offx = 0;
-  int offy = 0;
-	int last[3] = {0, 0, 0};
-  for (i = 0; i < dims.w*dims.h/256; i++) {
-    offx = i%(dims.w/16);
-    offy = i/(dims.w/16);
-    rgb_to_dct_block_old(in, out[0], out[1], out[2],offx, offy, dims);
-  }
-  for (i = 0; i < dims.w*dims.h/64; i++) {
-    // if(i >= dims.w && i < dims.w*16+256) printf("pre: %i - ", out[0][i*64]);
-    out[0][i*64] -= last[0];
-    // if(i >= fullImage.w && i < fullImage.w*16+256) printf("post: %i - ", out[0][i*64]);
-    last[0] += out[0][i*64];
-    // if(i >= fullImage.w && i < fullImage.w*16+256) printf("new last: %i\n", last[0]);
-    if(i < dims.w*dims.h/256){
-      out[1][i*64] -= last[1]; 
-      last[1] += out[1][i*64]; 
-      out[2][i*64] -= last[2]; 
-      last[2] += out[2][i*64]; 
-    }
-  }
-}
-
+/* rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims)
+ *  in = array of rgb , out = recipients for the 3 output channels
+ *  dims = area of the image containing the difference 
+ *  
+ *  function that converts a sub-image of the raw image contained in the in array to YCbCr to which is appiled a subsampling, a dct and a quantization
+ *  the sub-image dimensions are contained into dims
+ */
 void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
   int i = 0;
   int off = dims.y*WIDTH + dims.x;
   uint8_t app[2][2*dims.w];
   uint8_t mid[3][dims.w*dims.h];
-  // int dctapp[3][8*WIDTH];
   int last[3] = {0, 0, 0};
   int begin, j;
 	for (; i < dims.w*dims.h; i++) {
     int r = i%dims.w;
     int l = i/dims.w;
-		// mid[0][(l%8)*WIDTH+r]                =       0.299    * in[0][i] + 0.587    * in[1][i] + 0.114    * in[2][i];
 		mid[0][i]              =       0.299    * in[0][i+off] + 0.587    * in[1][i+off] + 0.114    * in[2][i+off];
 		app[0][(l%2)*dims.w+r] = 128 - 0.168736 * in[0][i+off] - 0.331264 * in[1][i+off] + 0.5      * in[2][i+off];
 		app[1][(l%2)*dims.w+r] = 128 + 0.5      * in[0][i+off] - 0.418688 * in[1][i+off] - 0.081312 * in[2][i+off];
     if (r%2 == 1 && l%2 == 1) {
 			 mid[1][(l/2*dims.w)/2+r/2] = (app[0][r-1] + app[0][r] + app[0][dims.w+r-1] + app[0][dims.w+r])/4;
 			 mid[2][(l/2*dims.w)/2+r/2] = (app[1][r-1] + app[1][r] + app[1][dims.w+r-1] + app[1][dims.w+r])/4;
-    }
     if (r%8 == 7 && l%8 == 7) {
       begin = i - 7*(dims.w+1);
       j = ((begin%dims.w) + (begin/dims.w)*(dims.w/8))/8;
       int ih = j%(dims.w/8); 
       int iv = j/(dims.w/8); 
-      // dct_block(WIDTH, mid[0] + ih*8, out[0] + (iv*(WIDTH/8)+ih)*64, luma_quantizer);
       dct_block(dims.w, mid[0] + iv*dims.w*8 + ih*8, out[0] + (iv*(dims.w/8)+ih)*64, luma_quantizer);
       out[0][(iv*(dims.w/8)+ih)*64] -= last[0];
       last[0] += out[0][(iv*(dims.w/8)+ih)*64];
@@ -269,8 +242,6 @@ void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
         j = ((begin%(dims.w)) + (begin/(dims.w))*(dims.w/8))/8;
         ih = j%(dims.w/8); 
         iv = j/(dims.w/8); 
-        // dct_block(WIDTH/2, mid[1] + (ih)*4, out[1] + (iv*WIDTH/16+ih)*32, chroma_quantizer);
-        // dct_block(WIDTH/2, mid[2] + (ih)*4, out[2] + (iv*WIDTH/16+ih)*32, chroma_quantizer);
         dct_block(dims.w/2, mid[1] + (iv*dims.w + ih*2)*2, out[1] + (iv*dims.w/16+ih)*32, chroma_quantizer);
         dct_block(dims.w/2, mid[2] + (iv*dims.w + ih*2)*2, out[2] + (iv*dims.w/16+ih)*32, chroma_quantizer);
         out[1][(iv*dims.w/16+ih)*32] -= last[1];
@@ -278,6 +249,7 @@ void rgb_to_dct(uint8_t in[3][PIX_LEN], int16_t out[3][PIX_LEN], area_t dims) {
         out[2][(iv*dims.w/16+ih)*32] -= last[2];
         last[2] += out[2][(iv*dims.w/16+ih)*32];
       }
+    }
     }
     if (r == (dims.w - 1)){
       off += (WIDTH - dims.w);
@@ -626,6 +598,14 @@ void write_dht_header(FILE* f, int code_len_freq[], int sym_sorted[], int tc_th)
 		fputc(sym_sorted[i], f); // huffval, needed to reconstruct the huffman code at the receiver
 }
 
+/* write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code Luma[2], huff_code Chroma[2])
+ *  file_name = name of the file  where to write the jpg out
+ *  out = recipients for the 3 output channels
+ *  dims = area of the image containing the difference 
+ *  [Luma, Chroma] pair of structs containing the information of the huffman code for each channel
+ *
+ *  function that generates and writes the jpg data into a file 
+ */
 void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
 	FILE* f = fopen(file_name, "w");
 	fputc(0xFF, f); fputc(0xD8, f); // SOI Symbol
@@ -713,6 +693,12 @@ void write_file(char* file_name, int16_t out[3][PIX_LEN], area_t dims, huff_code
 	fclose(f);
 }
 
+/* writePpm(FILE * f, uint8_t sub[3][PIX_LEN/16])
+ *  f = pointer to the file where to write the jpg out
+ *  sub = array containing the subsampled image
+ *
+ *  function that writes the subsampled raw image data into a file 
+ */
 int writePpm(FILE * f, uint8_t sub[3][PIX_LEN/16]) {
   fprintf(f, "P6\n%i %i\n255\n", WIDTH, HEIGHT);
   for (int i = 0; i < (PIX_LEN); i++){
@@ -726,6 +712,13 @@ int writePpm(FILE * f, uint8_t sub[3][PIX_LEN/16]) {
   return 0;
 }
 
+/* writeDiffPpm(char * filename, uint8_t sub[3][PIX_LEN], area_t * dims)
+ *  file_name = name of the file where to write the raw out
+ *  sub = array containing the complete image
+ *  dims = area of the image containing the difference 
+ *
+ *  function that writes the raw image data of a sub-image into a file 
+ */
 int writeDiffPpm(char * filename, uint8_t sub[3][PIX_LEN], area_t * dims) {
   FILE * f = fopen(filename, "w");
   int off = WIDTH * dims->y + dims->x;
@@ -741,35 +734,19 @@ int writeDiffPpm(char * filename, uint8_t sub[3][PIX_LEN], area_t * dims) {
   return 0;
 }
 
+/* encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims)
+ *  name = name of the file where to write the jpg out
+ *  raw = array containing the raw image data
+ *  dims = area of the image containing the difference 
+ *
+ *  function that encapsulates all the steps of
+ *  the jpeg conversion in a single function call
+ */
 void encodeNsend(char * name, uint8_t raw[3][PIX_LEN], area_t dims) {
   int16_t ordered_dct[3][PIX_LEN];
   huff_code Luma[2];
   huff_code Chroma[2];
   rgb_to_dct(raw, ordered_dct, dims);
-  FILE * Y = fopen("dct_Y", "w");
-  FILE * Cb = fopen("dct_Cb", "w");
-  FILE * Cr = fopen("dct_Cr", "w");
-  for (int i = 0; i < dims.w*dims.h; i++) {
-  // for (int i = 0; i < 256; i++) {
-    if (i < dims.w*dims.h/4) {
-    // if (i < 64) {
-      fprintf(Cb, "%i ", ordered_dct[1][i]);
-      fprintf(Cr, "%i ", ordered_dct[2][i]);
-    }
-    fprintf(Y, "%i ", ordered_dct[0][i]);
-  }
-  fclose(Y);
-  fclose(Cb);
-  fclose(Cr);
 	init_huffman(ordered_dct, dims, Luma, Chroma);
-	write_file(name, ordered_dct, dims, Luma, Chroma);
-}
-
-void encodeNsend_blocks(char * name, uint8_t raw[3*PIX_LEN], area_t dims) {
-  int16_t ordered_dct[3][PIX_LEN];
-  huff_code Luma[2];
-  huff_code Chroma[2];
-  rgb_to_dct_new(raw, ordered_dct, dims);
-  init_huffman(ordered_dct, dims, Luma, Chroma);
 	write_file(name, ordered_dct, dims, Luma, Chroma);
 }

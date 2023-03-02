@@ -7,6 +7,12 @@
 
 int saved[3][PIX_LEN/16];
 
+/* subsample(uint8_t in[3][PIX_LEN], uint8_t out[3][PIX_LEN/16])
+ *  in = rgb array, out = recipient for the subsampled rgb array
+ *  
+ *  function that applies a 8:2:0:0:0 subsampling to the image
+ *  dividing the sample rate of the image by 4 in each axis
+ */
 void subsample(uint8_t in[3][PIX_LEN], uint8_t out[3][PIX_LEN/16]) {
   int i = 0;
   for (; i < PIX_LEN/16; i++) {
@@ -31,6 +37,11 @@ void subsample(uint8_t in[3][PIX_LEN], uint8_t out[3][PIX_LEN/16]) {
   }
 }
 
+/* store(uint8_t in[3][PIX_LEN/16])
+ *  in = subsampled rgb arrays (one for each component)
+ *  
+ *  function that copies the subsampled image to the saved array
+ */
 void store(uint8_t in[3][PIX_LEN/16]) {
   int i = 0;
   for(; i < PIX_LEN/16; i++) {
@@ -40,12 +51,22 @@ void store(uint8_t in[3][PIX_LEN/16]) {
   }
 }
 
+/* overlap(area_t a1, area_t a2)
+ *  [a1, a2] = areas to be compared in order ot understand if they are overlapping or not
+ *  
+ *  function that check if 2 areas are overlapping 
+ */
 int overlap(area_t a1, area_t a2){
   int orizover = !(a1.x > a2.w + 1 || a1.w + 1 < a2.x);
   int vertover = !(a1.y > a2.h + 1 || a1.h + 1 < a2.y);
   return orizover && vertover;
 }
 
+/* sumAreas(area_t * a1, area_t a2)
+ *  [a1, a2] = areas to be merged in a single bigged area
+ *  
+ *  function that, given 2 areas that are overlapping, creates a single area beeing the sum of the 2 given areas 
+ */
 void sumAreas(area_t * a1, area_t a2) {
   if((a1->x == -1 || a1->y == -1 || a1->w == -1 || a1->h == -1) && (a2.x == -1 || a2.y == -1 || a2.w == -1 || a2.h == -1)) {
     a1->x = -1;
@@ -66,6 +87,12 @@ void sumAreas(area_t * a1, area_t a2) {
   }
 }
 
+/* cumulativeMerge(pair_t * diffs, int index)
+ *  diffs = array containing the 1D differences used to build the 2D one
+ *  index = index of the first difference in the array
+ *  
+ *  function that recursively generates a 2D difference starting from a lined list of 1D differences 
+ */
 area_t cumulativeMerge(pair_t * diffs, int index){
   int i = 0;
   area_t a;
@@ -89,7 +116,13 @@ area_t cumulativeMerge(pair_t * diffs, int index){
   return a;
 }
 
-int compare(uint8_t in[3][PIX_LEN/16], area_t outs[1000]){
+/* compare(uint8_t in[3][PIX_LEN/16], area_t outs[1000])
+ *  in = arrays containing the subsampled image to be compared with the one contained in saved
+ *  outs = recipient for the output differences
+ *  
+ *  function that generates the 2D differences between the 2 images given as input 
+ */
+int compare(uint8_t in[3][PIX_LEN/16], area_t outs[100]){
   int isDifferent = 0;
   pair_t differences[PIX_LEN/32];
   struct {
@@ -160,7 +193,7 @@ int compare(uint8_t in[3][PIX_LEN/16], area_t outs[1000]){
       outs[isDifferent].w = a.w;
       outs[isDifferent].h = a.h;
       isDifferent++;
-      if (isDifferent > 1000) {
+      if (isDifferent > 100) {
         return isDifferent;
       }
     }
@@ -168,6 +201,13 @@ int compare(uint8_t in[3][PIX_LEN/16], area_t outs[1000]){
   return isDifferent;
 }
 
+/* enlargeAdjust(area_t * a)
+ *  a = area that is going to be enlarged
+ *  
+ *  function that enlarges the given area in order to make it fit the
+ *  original image dimensions and enshures that the generated areas are
+ *  compatible with the 2DDCT constraints (width and height multiple of 16)
+ */
 void enlargeAdjust(area_t * a) {
   a->x *= 4;
   a->y *= 4;
