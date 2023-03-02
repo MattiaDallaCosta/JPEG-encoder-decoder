@@ -45,7 +45,7 @@ const int scan_order[] = {
 58, 59, 52, 45, 38, 31, 39, 46,
 53, 60, 61, 54, 47, 55, 62, 63};
 
-/* double_t getDouble(const int64_t *bitval)
+/* getDouble(const int64_t *bitval)
  *  bitval = pointer to the int64_t to be converted in double
  *
  *  function that returns the double_t value stored in an int64_t variable
