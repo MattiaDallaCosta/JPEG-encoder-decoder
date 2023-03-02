@@ -15,7 +15,6 @@
 #include "include/structs.h"
 
 uint8_t raw[3][PIX_LEN];
-uint8_t rawA[3*PIX_LEN];
 uint8_t subsampled[3][PIX_LEN/16];
 uint8_t stored = 0;
 int qid;
@@ -84,11 +83,6 @@ int main(int argc, char ** argv) {
 	  	continue;
 	  }
 	  fclose(f_in);
-    for (int i = 0; i < PIX_LEN; i++) {
-      rawA[3*i] = raw[0][i];
-      rawA[3*i+1] = raw[1][i];
-      rawA[3*i+2] = raw[2][i];
-    }
     gettimeofday(&read_t, NULL);
     millielapsed = (read_t.tv_usec - start.tv_usec)/1000;
     secelapsed = (read_t.tv_sec - start.tv_sec);
@@ -117,7 +111,7 @@ int main(int argc, char ** argv) {
           getName(text, newname, i);
           // sprintf(newname, "out-%i.jpg", i);
           enlargeAdjust(&diffDims[i]);
-          encodeNsend_blocks(newname, rawA, diffDims[i]);
+          encodeNsend(newname, raw, diffDims[i]);
           gettimeofday(&op_t, NULL);
           millielapsed = (op_t.tv_usec - appo.tv_usec)/1000;
           secelapsed = (op_t.tv_sec - appo.tv_sec);
@@ -138,11 +132,8 @@ int main(int argc, char ** argv) {
       fullImage.y = 0;
       fullImage.w = WIDTH;
       fullImage.h = HEIGHT;
-      // fullImage.w = 16;
-      // fullImage.h = 16;
       getName(text, newname, -1);
-      // encodeNsend(newname, raw, fullImage);
-      encodeNsend_blocks(newname, rawA, fullImage);
+      encodeNsend(newname, raw, fullImage);
       gettimeofday(&op_t, NULL);
       millielapsed = (op_t.tv_usec - store_t.tv_usec)/1000;
       secelapsed = (op_t.tv_sec - store_t.tv_sec);
