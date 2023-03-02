@@ -8,6 +8,6 @@
  This program continuously compares the saved image (subsampled before saving) with a newly taken one and if differences are found creates a .jpg file for each of those, then saves the newly taken image as the saved one and sleeps before rerunning the comparison with a new image.
 ## Build and run
  The esp-idf framework (https://github.com/espressif/esp-idf for additional information on installation) is needed in order to build this project.
- After installing the framework idf.py build is used to build the project while ``idf.py flash <PORT>`` is used to flash the executable in the microcontroller memory and start the execution.
+ After installing the framework ``idf.py build`` is used to build the project while ``idf.py flash <PORT>`` is used to flash the executable in the microcontroller memory and start the execution.
  In order to monitor the output of the program ``idf.py monitor <PORT>`` is used
 #### ``<PORT>`` represents the USB connection to which the board is connected (``/dev/ttyUSB*`` for \*NIX systems or COM* for Windows)
