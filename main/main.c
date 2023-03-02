@@ -19,10 +19,6 @@ static const char *TAG = "image comparator";
 const char *sub_file = MOUNT_POINT"/sub";
 const char *store_file = MOUNT_POINT"/stored";
 const char *j_file = MOUNT_POINT"/jpg";
-const char *Y_file = MOUNT_POINT"/Y";
-const char *Cb_file = MOUNT_POINT"/Cb";
-const char *Cr_file = MOUNT_POINT"/Cr";
-const char *info_file = MOUNT_POINT"/info";
 
 static esp_err_t init_camera();
 
@@ -122,7 +118,6 @@ void app_main(void) {
   // camera
   int i = 0;
   init_camera();
-  vTaskDelay(100 / portTICK_PERIOD_MS);
   fb = esp_camera_fb_get();
   esp_camera_fb_return(fb);
   fb = esp_camera_fb_get();

@@ -45,11 +45,20 @@ const int scan_order[] = {
 58, 59, 52, 45, 38, 31, 39, 46,
 53, 60, 61, 54, 47, 55, 62, 63};
 
+/* double_t getDouble(const int64_t *bitval)
+ *  bitval = pointer to the int64_t to be converted in double
+ *
+ *  function that returns the double_t value stored in an int64_t variable
+ *  (to maintain preciseness and avoid calculating it at startup)
+ */
 double_t getDouble(const int64_t *bitval) {                                              // convert the double_t value, saved as int64_t in order
     return *((double_t*)(bitval));                                                       // to maintain the preciseness, into an actual double_t
 }
 
 /* zigzag_block(int16_t in[64], int16_t * out)
+ *  in = array containing the block to be reordered
+ *  out = array where to put the reordered sequence
+ *
  *  function that reorders a block based on the scan_order array
  *  with the purpose of grouping the non 0 values at the beginning of the array 
  */
@@ -61,6 +70,11 @@ void zigzag_block(int16_t in[64], int16_t * out) {
 }
 
 /* dct_block(int gap, uint8_t in[], int16_t * out, const int quantizer[])
+ *  gap = distance from the left border of the image
+ *  in = input array containing a single channel of YCbCr (the 2 crominances are subsampled)
+ *  out = array where to store the reordered dct block
+ *  quantizer = the array containing the quantization table for the channel to be transformed
+ *
  *  function that applies the discrete cosine transform to the image blocks
  *  (8x8 blocks as specified from the JPG specification) 
  */
@@ -97,13 +111,13 @@ void dct_block(int gap, uint8_t in[], int16_t * out, const int quantizer[]) {
   zigzag_block(dct, out);                   // applies the reordering funcion
 }
 
-/*  rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, int dimw) 
- *    in = array of rgb , [Y,Cb,Cr] recipients for the 3 output channels
- *    [offx,offy] offset in the two axes from the beginning of in (in number of 16x16 blocks done) 
+/* rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, area_t dims) 
+ *  in = array of rgb , [Y,Cb,Cr] recipients for the 3 output channels
+ *  [offx,offy] offset in the two axes from the top left corner of dims (in number of 16x16 blocks done) 
+ *  dims = area of the image containing the difference (used for the x and y offsets in the image)
  *  
- *    function that converts a block of rgb in a block of dct reorderd to group the 0s togeder 
+ *  function that converts a block of rgb in a block of dct reorderd to group the 0s togeder 
  */
-
 void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx, int offy, area_t dims) {
   // printf("offx = %i, offy = %i, dimmw = %i\n", offx, offy, dimw);
   int i = 0;
@@ -113,22 +127,22 @@ void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx
   uint8_t midCbCr[2][64];                                           // sublsampled Cb[0] and Cr[1]                                                                                         
   int begin, j;                                                     
   for (i = 0; i < 256; i++) {                                       // loop on the block (16*16 = 256)
-  int r = i%16;                                                     // value that rappresents the index of the pixel in the line (which column of the block)
-  int l = i/16;                                                     // value that rappresents the line we are currently in (which row of the block)
-  int index = 3*((offy*16+dims.y+l)*WIDTH+offx*16+dims.x+r);        // index of red component of pixel in input array
-	midY[i]            =       0.299    * in[index+2] + 0.587    * in[index+1] + 0.114    * in[index]; // Rgb -> Y
-	app[0][(l%2)*16+r] = 128 - 0.168736 * in[index+2] - 0.331264 * in[index+1] + 0.5      * in[index]; // Rgb -> Cb
-	app[1][(l%2)*16+r] = 128 + 0.5      * in[index+2] - 0.418688 * in[index+1] - 0.081312 * in[index]; // Rgb -> Cr
+    int r = i%16;                                                     // value that rappresents the index of the pixel in the line (which column of the block)
+    int l = i/16;                                                     // value that rappresents the line we are currently in (which row of the block)
+    int index = 3*((offy*16+dims.y+l)*WIDTH+offx*16+dims.x+r);        // index of red component of pixel in input array
+	  midY[i]            =       0.299    * in[index+2] + 0.587    * in[index+1] + 0.114    * in[index]; // Rgb -> Y
+	  app[0][(l%2)*16+r] = 128 - 0.168736 * in[index+2] - 0.331264 * in[index+1] + 0.5      * in[index]; // Rgb -> Cb
+	  app[1][(l%2)*16+r] = 128 + 0.5      * in[index+2] - 0.418688 * in[index+1] - 0.081312 * in[index]; // Rgb -> Cr
     if (r%2 == 1 && l%2 == 1) {
       midCbCr[0][(l/2)*8+r/2] = (app[0][r-1] + app[0][r] + app[0][r+15] + app[0][r+16])/4; // sublsampling Cb
       midCbCr[1][(l/2)*8+r/2] = (app[1][r-1] + app[1][r] + app[1][r+15] + app[1][r+16])/4; // sublsampling Cr
-    }
-    if (r%8 == 7 && l%8 == 7) {                      // checks when it is at the end of a dct_block (8x8)
-      begin = i - 119;                               // goes to the beginning of the block (subtracts 119 = 7*(16+1) meaning it goes back of 7 lines (7*16) and 7 blocks (7*1))
-      j = ((begin%16) + (begin/16)*2)/8;             // index of the 8x8 block now worked on in the bigger 16x16 block
-      int ih = j%2;                                  // x = the block (0 or 1)
-      int iv = j/2;                                  // y = the block (0 or 1) 
-      dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy*2+iv)*dims.w/8+offx*2+ih)*64, luma_quantizer); // executes the dct of one of the 8x8 blocks of Y
+      if (r%8 == 7 && l%8 == 7) {                      // checks when it is at the end of a dct_block (8x8)
+        begin = i - 119;                               // goes to the beginning of the block (subtracts 119 = 7*(16+1) meaning it goes back of 7 lines (7*16) and 7 blocks (7*1))
+        j = ((begin%16) + (begin/16)*2)/8;             // index of the 8x8 block now worked on in the bigger 16x16 block
+        int ih = j%2;                                  // x = the block (0 or 1)
+        int iv = j/2;                                  // y = the block (0 or 1) 
+        dct_block(16, midY + (iv)*128 + ih*8, Y + ((offy*2+iv)*dims.w/8+offx*2+ih)*64, luma_quantizer); // executes the dct of one of the 8x8 blocks of Y
+      }
     }
   }
   dct_block(8, midCbCr[0], Cb + offCbCr, chroma_quantizer); // executes the dct of the 8x8 block of Cb (only one because of subsampling)
@@ -136,7 +150,10 @@ void rgb_to_dct_block(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr,int offx
 }
 
 /* rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims)
- *  applies the rgb_to_dct_block to all the 16x16 blocks of the image in the area defined by dims
+ *  in = array of rgb , [Y,Cb,Cr] recipients for the 3 output channels
+ *  dims = area of the image containing the difference 
+ *  
+ *  function that applies the rgb_to_dct_block to all the 16x16 blocks of the image in the area defined by dims
  */
 void rgb_to_dct(uint8_t *in, int16_t *Y, int16_t *Cb, int16_t *Cr, area_t dims) {
   int i;
@@ -520,6 +537,15 @@ int mid[] = { 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 
 int coef_info[] = { 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00 };
 int eoi[] = { 0xFF, 0xD9 };
 
+/* write_jpg(FILE * f, uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2])
+ *  f = pointer to the file  where to write the jpg out
+ *  jpg = array where to store the final jpg data
+ *  [Y,Cb,Cr] recipients for the 3 output channels
+ *  dims = area of the image containing the difference 
+ *  [Luma, Chroma] pair of structs containing the information of the huffman code for each channel
+ *
+ *  function that generates and writes the jpg data into a file 
+ */
 size_t write_jpg(FILE * f, uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2]) {
 	size_t size = 0;
   int i;

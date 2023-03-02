@@ -12,6 +12,3 @@ include/credentials.h
 gdbinit
 build
 .cache
-jpeg.png
-algorithm.jpg
-encoding.jpg
