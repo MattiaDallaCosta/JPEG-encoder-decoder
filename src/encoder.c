@@ -45,7 +45,7 @@ const int scan_order[] = {
 58, 59, 52, 45, 38, 31, 39, 46,
 53, 60, 61, 54, 47, 55, 62, 63};
 
-/* int readPpm(FILE* f, uint8_t * raw)
+/* readPpm(FILE* f, uint8_t * raw)
  *  f = pointer to the file beeing read
  *  raw = array where the regb sequence retreived from the file is saved
  *
@@ -110,7 +110,7 @@ X:	fprintf(stderr, "Could not parse the PPM file properly\n");
 	return -1;
 }
 
-/* double_t getDouble(const int64_t *bitval)
+/* getDouble(const int64_t *bitval)
  *  bitval = pointer to the int64_t to be converted in double
  *
  *  function that returns the double_t value stored in an int64_t variable
@@ -120,7 +120,7 @@ double_t getDouble(const int64_t *bitval) {
     return *((double_t*)(bitval));
 }
 
-/* void getName(char *name, char *buff, int num)
+/* getName(char *name, char *buff, int num)
  *  name = the string containing the name of the original file
  *  buff = the string where the new name is stored
  *  num = the number of the difference of which the jpg is beeing done (-1 if full image)
@@ -137,7 +137,7 @@ void getName(char *name, char *buff, int num) {
   strcpy(pos, end);
 }
 
-/* void getSavedName(char *name, char *buff) 
+/* getSavedName(char *name, char *buff) 
  *  name = the string containing the name of the original file
  *  buff = the string where the new name is stored
  *  
@@ -639,7 +639,7 @@ int mid[] = { 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 
 int coef_info[] = { 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00 };
 int eoi[] = { 0xFF, 0xD9 };
 
-/* size_t write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2])
+/* write_file(char* file_name, uint8_t * jpg, int16_t * Y, int16_t * Cb, int16_t * Cr, area_t dims, huff_code Luma[2], huff_code Chroma[2])
  *  file_name = name of the file  where to write the jpg out
  *  jpg = array where to store the final jpg data
  *  [Y,Cb,Cr] recipients for the 3 output channels

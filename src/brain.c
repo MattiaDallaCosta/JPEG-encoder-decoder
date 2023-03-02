@@ -5,6 +5,13 @@
 #include <strings.h>
 #include <unistd.h>
 
+/* subsample(FILE * f, uint8_t *in, uint8_t *out)
+ *  f = pointer to the file where to save the subsampled image
+ *  in = rgb array, out = recipient for the subsampled rgb array
+ *  
+ *  function that applies a 8:2:0:0:0 subsampling to the image
+ *  dividing the sample rate of the image by 4 in each axis
+ */
 void subsample(uint8_t *in, uint8_t *out) {
   int i = 0;
   uint16_t appo;
@@ -34,6 +41,11 @@ void subsample(uint8_t *in, uint8_t *out) {
   }
 }
 
+/* store(uint8_t *in, uint8_t saved[3*PIX_LEN/16])
+ *  in = subsampled rgb array, saved = array containing the saved image used by the comparator
+ *  
+ *  function that copies the subsampled image to the saved array
+ */
 void store(uint8_t *in, uint8_t saved[3*PIX_LEN/16]) {
   int i = 0;
   for(; i < PIX_LEN/16; i++) {
@@ -43,6 +55,12 @@ void store(uint8_t *in, uint8_t saved[3*PIX_LEN/16]) {
   }
 }
 
+/* overlap(area_t a1, area_t a2)
+ *  [a1, a2] = areas to be compared in order ot understand if they are overlapping or not
+ *  
+ *  functions that check if 2 areas are overlapping 
+ *  (overlap is used for non enlargedAdjusted areas while overlap2 is used after enlargeAdjust is applied)
+ */
 int overlap(area_t a1, area_t a2){
   int orizover = !(a1.x > a2.w + 1 || a1.w + 1 < a2.x);
   int vertover = !(a1.y > a2.h + 1 || a1.h + 1 < a2.y);
@@ -55,6 +73,11 @@ int overlap2(area_t a1, area_t a2){
   return orizover && vertover;
 }
 
+/* sumAreas(area_t * a1, area_t a2)
+ *  [a1, a2] = areas to be merged in a single bigged area
+ *  
+ *  function that, given 2 areas that are overlapping, creates a single area beeing the sum of the 2 given areas 
+ */
 void sumAreas(area_t * a1, area_t a2) {
   if((a1->x < 0 -1 || a1->y < 0 || a1->w < 0 -1 || a1->h < 0) && (a2.x < 0 || a2.y < 0 || a2.w <0 || a2.h < 0)) {
     a1->x = -1;
@@ -75,6 +98,13 @@ void sumAreas(area_t * a1, area_t a2) {
   }
 }
 
+/* compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t differences[2][WIDTH/8])
+ *  [in, saved] = arrays containing the 2 subsampled images to be compared
+ *  outs = recipient for the output differences
+ *  differences = recipient for the intermediate 1D differences (2 image rows)
+ *  
+ *  function that generates the 2D differences between the 2 images given as input 
+ */
 uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t differences[2][WIDTH/8]) {
   int isDifferent = 0;
   int index = 0;
@@ -204,6 +234,13 @@ uint8_t compare(uint8_t *in, uint8_t saved[3*PIX_LEN/16], area_t * outs, pair_t 
   return outsIndex;
 }
 
+/* enlargeAdjust(area_t * a)
+ *  a = area that is going to be enlarged
+ *  
+ *  function that enlarges the given area in order to make it fit the
+ *  original image dimensions and enshures that the generated areas are
+ *  compatible with the 2DDCT constraints (width and height multiple of 16)
+ */
 void enlargeAdjust(area_t * a) {
   a->w = a->w - a->x + 1;
   a->h = a->h - a->y + 1;
